@@ -1,0 +1,147 @@
+.ManageListPage {
+  position: relative;
+  min-height: 100vh;
+  padding: 2rem;
+  background-color: #ffffff;
+  color: #1f2a44;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.ManageListPage__header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.ManageListPage__back {
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
+  border: none;
+  border-radius: 0.375rem;
+  background-color: #e4e8f5;
+  color: #1f2a44;
+  cursor: pointer;
+}
+
+.ManageListPage__title {
+  font-size: 2rem;
+  margin: 0;
+}
+
+.ManageListPage__content {
+  flex: 1;
+  font-size: 1rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.ManageListPage__fileInput {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  opacity: 0;
+}
+
+.ManageListPage__status {
+  padding: 1.5rem;
+  background-color: #f4f6fb;
+  border-radius: 0.75rem;
+  color: #41506c;
+  line-height: 1.5;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.ManageListPage__status--error {
+  background-color: #fde8e8;
+  color: #a22727;
+  border: 1px solid rgba(162, 39, 39, 0.15);
+}
+
+.ManageListPage__primaryUpload {
+  align-self: flex-start;
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  border: none;
+  border-radius: 0.5rem;
+  background-color: #2d6cdf;
+  color: #ffffff;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 8px 20px rgba(45, 108, 223, 0.25);
+}
+
+.ManageListPage__primaryUpload:hover,
+.ManageListPage__primaryUpload:focus {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px rgba(45, 108, 223, 0.3);
+}
+
+.ManageListPage__primaryUpload:active {
+  transform: translateY(0);
+  box-shadow: 0 6px 16px rgba(45, 108, 223, 0.25);
+}
+
+.ManageListPage__tableWrapper {
+  flex: 1;
+  overflow: auto;
+  background-color: #ffffff;
+  border-radius: 0.75rem;
+  border: 1px solid #d8deed;
+  box-shadow: 0 8px 24px rgba(31, 42, 68, 0.05);
+}
+
+.ManageListPage__table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 320px;
+}
+
+.ManageListPage__table thead {
+  background-color: #f4f6fb;
+  color: #1f2a44;
+  font-weight: 600;
+}
+
+.ManageListPage__table th,
+.ManageListPage__table td {
+  padding: 0.85rem 1.25rem;
+  text-align: left;
+  border-bottom: 1px solid #e4eaf7;
+}
+
+.ManageListPage__table tbody tr:last-of-type td {
+  border-bottom: none;
+}
+
+.ManageListPage__upload {
+  position: absolute;
+  bottom: 1.5rem;
+  left: 1.5rem;
+  padding: 0.5rem 1.25rem;
+  font-size: 0.85rem;
+  border: none;
+  border-radius: 999px;
+  background-color: #2d6cdf;
+  color: #ffffff;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(45, 108, 223, 0.2);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.ManageListPage__upload:hover,
+.ManageListPage__upload:focus {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(45, 108, 223, 0.25);
+}
+
+.ManageListPage__upload:active {
+  transform: translateY(0);
+  box-shadow: 0 4px 12px rgba(45, 108, 223, 0.2);
+}
+
