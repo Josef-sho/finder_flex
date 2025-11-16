@@ -91,26 +91,35 @@ const NameFinderPage = ({ onBack }) => {
 
   return (
     <main className="NameFinderPage">
-      <header className="NameFinderPage__header">
-        <button type="button" className="NameFinderPage__back" onClick={onBack}>
-          ← Back
-        </button>
-        <h1 className="NameFinderPage__title">Name Finder</h1>
-      </header>
-
-      <form className="NameFinderPage__search" onSubmit={handleSubmit}>
-        <input
-          type="search"
-          value={query}
-          onChange={handleChange}
-          className="NameFinderPage__input"
-          placeholder="Search for your name"
-          aria-label="Search guest name"
-        />
-        <button type="submit" className="NameFinderPage__searchButton">
-          Search
-        </button>
-      </form>
+      <section className="NameFinderPage__hero">
+        <div className="NameFinderPage__heroContent">
+          <button type="button" className="NameFinderPage__back" onClick={onBack}>
+            ← Back to Admin
+          </button>
+          <p className="NameFinderPage__eventLabel">Exclusive celebration</p>
+          <h1 className="NameFinderPage__title">
+            TUNDE <span className="NameFinderPage__titleAccent">@ 60</span>
+          </h1>
+          <p className="NameFinderPage__subtitle">
+            Kindly enter your full name exactly as it appears on your invitation to
+            confirm attendance.
+          </p>
+          <form className="NameFinderPage__search" onSubmit={handleSubmit}>
+            <input
+              type="search"
+              value={query}
+              onChange={handleChange}
+              className="NameFinderPage__input"
+              placeholder="Write full name"
+              aria-label="Search guest name"
+            />
+            <button type="submit" className="NameFinderPage__searchButton">
+              Confirm Attendance
+            </button>
+          </form>
+        </div>
+        <div className="NameFinderPage__heroFigure" aria-hidden="true" />
+      </section>
 
       <section className="NameFinderPage__results">
         {query.trim() === '' ? (
@@ -201,4 +210,3 @@ const NameFinderPage = ({ onBack }) => {
 };
 
 export default NameFinderPage;
-
