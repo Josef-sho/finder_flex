@@ -2,6 +2,15 @@ import React, { useEffect, useMemo, useState } from 'react';
 import './NameFinderPage.css';
 import { GUEST_LIST_STORAGE_KEY } from './ManageListPage';
 
+const HERO_IMAGE_FILENAME = 'CELEBRANT IMAGE.png';
+const HERO_IMAGE_URL = `${process.env.PUBLIC_URL || ''}/images/${encodeURIComponent(
+  HERO_IMAGE_FILENAME
+)}`;
+const STARFIELD_IMAGE_FILENAME = 'stars-bg.png';
+const STARFIELD_IMAGE_URL = `${process.env.PUBLIC_URL || ''}/images/${encodeURIComponent(
+  STARFIELD_IMAGE_FILENAME
+)}`;
+
 const normalizeValue = (value) =>
   value
     .toLowerCase()
@@ -89,13 +98,50 @@ const NameFinderPage = ({ onBack }) => {
     event.preventDefault();
   };
 
+  const pageStyle = useMemo(
+    () => ({
+      '--nf-stars-bg': `url("${STARFIELD_IMAGE_URL}")`,
+    }),
+    []
+  );
+
+  const stars = useMemo(() => {
+    const count = 120;
+    return Array.from({ length: count }).map((_, index) => ({
+      id: index,
+      top: `${Math.random() * 100}%`,
+      left: `${Math.random() * 100}%`,
+      size: `${(Math.random() * 2 + 1).toFixed(2)}px`,
+      delay: `${(Math.random() * 8).toFixed(2)}s`,
+      duration: `${(Math.random() * 5 + 4).toFixed(2)}s`,
+      opacity: (0.4 + Math.random() * 0.5).toFixed(2),
+    }));
+  }, []);
+
   return (
-    <main className="NameFinderPage">
+    <main className="NameFinderPage" style={pageStyle}>
+      <div className="NFStarsLayer" aria-hidden="true">
+        {stars.map((star) => (
+          <span
+            key={`nf-star-${star.id}`}
+            className="NFStar"
+            style={{
+              top: star.top,
+              left: star.left,
+              width: star.size,
+              height: star.size,
+              animationDelay: star.delay,
+              animationDuration: star.duration,
+              opacity: star.opacity,
+            }}
+          />
+        ))}
+      </div>
       <section className="NameFinderPage__hero">
+        <button type="button" className="NameFinderPage__back" onClick={onBack}>
+          ← Back to Admin
+        </button>
         <div className="NameFinderPage__heroContent">
-          <button type="button" className="NameFinderPage__back" onClick={onBack}>
-            ← Back to Admin
-          </button>
           <p className="NameFinderPage__eventLabel">Exclusive celebration</p>
           <h1 className="NameFinderPage__title">
             TUNDE <span className="NameFinderPage__titleAccent">@ 60</span>
@@ -104,21 +150,27 @@ const NameFinderPage = ({ onBack }) => {
             Kindly enter your full name exactly as it appears on your invitation to
             confirm attendance.
           </p>
-          <form className="NameFinderPage__search" onSubmit={handleSubmit}>
-            <input
-              type="search"
-              value={query}
-              onChange={handleChange}
-              className="NameFinderPage__input"
-              placeholder="Write full name"
-              aria-label="Search guest name"
-            />
-            <button type="submit" className="NameFinderPage__searchButton">
-              Confirm Attendance
-            </button>
-          </form>
         </div>
-        <div className="NameFinderPage__heroFigure" aria-hidden="true" />
+        <div className="NameFinderPage__heroPortrait">
+          <img
+            src={HERO_IMAGE_URL}
+            alt="Celebrant portrait"
+            className="NameFinderPage__heroPortraitImage"
+          />
+        </div>
+        <form className="NameFinderPage__search" onSubmit={handleSubmit}>
+          <input
+            type="search"
+            value={query}
+            onChange={handleChange}
+            className="NameFinderPage__input"
+            placeholder="Write full name"
+            aria-label="Search guest name"
+          />
+          <button type="submit" className="NameFinderPage__searchButton">
+            Confirm Attendance
+          </button>
+        </form>
       </section>
 
       <section className="NameFinderPage__results">
