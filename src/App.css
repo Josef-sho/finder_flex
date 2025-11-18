@@ -1,3 +1,85 @@
 .App {
   min-height: 100vh;
 }
+
+.AdminGate {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: radial-gradient(circle at top, #050816, #010208 70%);
+  padding: 2rem;
+}
+
+.AdminGate__panel {
+  width: min(420px, 90vw);
+  background: rgba(6, 11, 27, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 1.5rem;
+  padding: 2.5rem;
+  color: #fdf1cd;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.55);
+  text-align: center;
+  font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif;
+}
+
+.AdminGate__title {
+  margin: 0 0 0.75rem;
+  font-size: 1.75rem;
+  letter-spacing: 0.1rem;
+}
+
+.AdminGate__subtitle {
+  margin: 0 0 1.5rem;
+  color: rgba(255, 255, 255, 0.75);
+  line-height: 1.6;
+}
+
+.AdminGate__subtitle--warning {
+  color: #f5c260;
+}
+
+.AdminGate__form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.AdminGate__input {
+  padding: 0.85rem 1.25rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(5, 8, 20, 0.8);
+  color: #fdf1cd;
+  font-size: 1rem;
+  outline: none;
+}
+
+.AdminGate__input::placeholder {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.AdminGate__error {
+  margin: 0;
+  color: #ff8a8a;
+  font-size: 0.9rem;
+}
+
+.AdminGate__button {
+  padding: 0.9rem 1.5rem;
+  border-radius: 999px;
+  border: none;
+  background: linear-gradient(120deg, #ffdc93, #f5b553);
+  color: #2a1b04;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08rem;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.AdminGate__button:hover,
+.AdminGate__button:focus-visible {
+  transform: translateY(-1px);
+  box-shadow: 0 15px 30px rgba(230, 176, 70, 0.35);
+}

@@ -34,7 +34,7 @@ const fuzzyIncludes = (target, query) => {
   return queryIndex === query.length;
 };
 
-const NameFinderPage = ({ onBack }) => {
+const NameFinderPage = () => {
   const [guestList, setGuestList] = useState([]);
   const [uploads, setUploads] = useState({});
   const [query, setQuery] = useState('');
@@ -138,9 +138,6 @@ const NameFinderPage = ({ onBack }) => {
         ))}
       </div>
       <section className="NameFinderPage__hero">
-        <button type="button" className="NameFinderPage__back" onClick={onBack}>
-          ← Back to Admin
-        </button>
         <div className="NameFinderPage__heroContent">
           <p className="NameFinderPage__eventLabel">Exclusive celebration</p>
           <h1 className="NameFinderPage__title">

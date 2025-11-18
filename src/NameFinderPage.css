@@ -229,24 +229,6 @@
   max-width: 32rem;
 }
 
-.NameFinderPage__back {
-  align-self: center;
-  padding: 0.5rem 1.2rem;
-  font-size: 0.95rem;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  background: rgba(2, 6, 19, 0.3);
-  color: var(--nf-text);
-  cursor: pointer;
-  transition: opacity 0.2s ease, transform 0.2s ease;
-}
-
-.NameFinderPage__back:hover,
-.NameFinderPage__back:focus-visible {
-  opacity: 0.9;
-  transform: translateY(-1px);
-}
-
 .NameFinderPage__search {
   width: 100%;
   max-width: 520px;
