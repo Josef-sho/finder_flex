@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import './NameFinderPage.css';
 import { GUEST_LIST_STORAGE_KEY } from './ManageListPage';
+import { loadGuestListFromFile } from './utils/excelParser';
 
 const HERO_IMAGE_FILENAME = 'CELEBRANT IMAGE.png';
 const HERO_IMAGE_URL = `${process.env.PUBLIC_URL || ''}/images/${encodeURIComponent(
@@ -38,6 +39,7 @@ const NameFinderPage = () => {
   const [guestList, setGuestList] = useState([]);
   const [uploads, setUploads] = useState({});
   const [query, setQuery] = useState('');
+  const [selectedGuest, setSelectedGuest] = useState(null);
 
   const uploadsStorageKey = useMemo(
     () => `${GUEST_LIST_STORAGE_KEY}:uploads`,
@@ -45,17 +47,36 @@ const NameFinderPage = () => {
   );
 
   useEffect(() => {
-    try {
-      const storedValue = window.localStorage.getItem(GUEST_LIST_STORAGE_KEY);
-      if (storedValue) {
-        const parsed = JSON.parse(storedValue);
-        if (Array.isArray(parsed)) {
-          setGuestList(parsed);
+    const loadGuestList = async () => {
+      // Try to load from Excel file first
+      const excelUrl = `${process.env.PUBLIC_URL || ''}/data/guest-list.xlsx`;
+      const guests = await loadGuestListFromFile(excelUrl);
+      
+      if (guests.length > 0) {
+        setGuestList(guests);
+        // Also save to localStorage as backup
+        try {
+          window.localStorage.setItem(GUEST_LIST_STORAGE_KEY, JSON.stringify(guests));
+        } catch (storageError) {
+          console.error('Failed to save guest list to storage', storageError);
+        }
+      } else {
+        // Fallback to localStorage if Excel file not found
+        try {
+          const storedValue = window.localStorage.getItem(GUEST_LIST_STORAGE_KEY);
+          if (storedValue) {
+            const parsed = JSON.parse(storedValue);
+            if (Array.isArray(parsed)) {
+              setGuestList(parsed);
+            }
+          }
+        } catch (storageError) {
+          console.error('Failed to read guest list from storage', storageError);
         }
       }
-    } catch (storageError) {
-      console.error('Failed to read guest list from storage', storageError);
-    }
+    };
+
+    loadGuestList();
   }, []);
 
   useEffect(() => {
@@ -92,10 +113,23 @@ const NameFinderPage = () => {
 
   const handleChange = (event) => {
     setQuery(event.target.value);
+    setSelectedGuest(null); // Clear selection when typing
+  };
+
+  const handleSuggestionClick = (guest) => {
+    setQuery(guest.name);
+    setSelectedGuest(guest);
   };
 
   const handleSubmit = (event) => {
     event.preventDefault();
+    // If there's exactly one result, select it
+    if (results.length === 1 && !selectedGuest) {
+      setSelectedGuest(results[0]);
+    } else if (results.length > 0 && query.trim()) {
+      // If multiple results, select the first one
+      setSelectedGuest(results[0]);
+    }
   };
 
   const pageStyle = useMemo(
@@ -171,87 +205,112 @@ const NameFinderPage = () => {
       </section>
 
       <section className="NameFinderPage__results">
-        {query.trim() === '' ? (
-          <p className="NameFinderPage__hint">
-            Start typing your name to see if you are on the guest list.
-          </p>
-        ) : results.length ? (
+        {!selectedGuest ? (
+          <>
+            {query.trim() === '' ? (
+              <p className="NameFinderPage__hint">
+                Start typing your name to see if you are on the guest list.
+              </p>
+            ) : results.length ? (
+              <div className="NameFinderPage__suggestions">
+                <p className="NameFinderPage__suggestionsLabel">
+                  Select your name from the list:
+                </p>
+                <ul className="NameFinderPage__suggestionsList">
+                  {results.map((guest) => (
+                    <li key={`${guest.name}-${guest.table}`}>
+                      <button
+                        type="button"
+                        className="NameFinderPage__suggestion"
+                        onClick={() => handleSuggestionClick(guest)}
+                      >
+                        {guest.name}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <p className="NameFinderPage__hint">
+                No guests matched the name you entered. Double-check your spelling or
+                contact the event coordinator.
+              </p>
+            )}
+          </>
+        ) : (
           <div className="NameFinderPage__resultsContainer">
-            {results.map((guest) => {
-              const invitation = uploads[guest.table];
-              const isImage = invitation?.type?.startsWith('image/');
-              const isPDF = invitation?.type === 'application/pdf';
-
-              return (
-                <div key={`${guest.name}-${guest.table}`} className="NameFinderPage__result">
-                  <h2 className="NameFinderPage__guestName">{guest.name}</h2>
-                  {invitation ? (
-                    <div className="NameFinderPage__invitation">
-                      {isImage ? (
-                        <>
-                          <img
-                            src={invitation.dataUrl}
-                            alt={`Invitation for ${guest.name}`}
-                            className="NameFinderPage__invitationImage"
-                          />
-                          <a
-                            href={invitation.dataUrl}
-                            download={invitation.name}
-                            className="NameFinderPage__downloadButton"
-                          >
-                            Download Invitation
-                          </a>
-                        </>
-                      ) : isPDF ? (
-                        <div className="NameFinderPage__pdfContainer">
-                          <p className="NameFinderPage__pdfLabel">
-                            Your invitation is ready
-                          </p>
-                          <div className="NameFinderPage__pdfActions">
-                            <a
-                              href={invitation.dataUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="NameFinderPage__pdfLink NameFinderPage__pdfLink--view"
-                            >
-                              View PDF
-                            </a>
-                            <a
-                              href={invitation.dataUrl}
-                              download={invitation.name}
-                              className="NameFinderPage__pdfLink NameFinderPage__pdfLink--download"
-                            >
-                              Download PDF
-                            </a>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="NameFinderPage__fileContainer">
-                          <p className="NameFinderPage__fileName">{invitation.name}</p>
-                          <a
-                            href={invitation.dataUrl}
-                            download={invitation.name}
-                            className="NameFinderPage__downloadLink"
-                          >
-                            Download Invitation
-                          </a>
-                        </div>
-                      )}
+            <button
+              type="button"
+              className="NameFinderPage__backButton"
+              onClick={() => {
+                setSelectedGuest(null);
+                setQuery('');
+              }}
+            >
+              ← Search Again
+            </button>
+            <div className="NameFinderPage__result">
+              <h2 className="NameFinderPage__guestName">{selectedGuest.name}</h2>
+              {uploads[selectedGuest.table] ? (
+                <div className="NameFinderPage__invitation">
+                  {uploads[selectedGuest.table]?.type?.startsWith('image/') ? (
+                    <>
+                      <img
+                        src={uploads[selectedGuest.table].dataUrl}
+                        alt={`Invitation for ${selectedGuest.name}`}
+                        className="NameFinderPage__invitationImage"
+                      />
+                      <a
+                        href={uploads[selectedGuest.table].dataUrl}
+                        download={uploads[selectedGuest.table].name}
+                        className="NameFinderPage__downloadButton"
+                      >
+                        Download Invitation
+                      </a>
+                    </>
+                  ) : uploads[selectedGuest.table]?.type === 'application/pdf' ? (
+                    <div className="NameFinderPage__pdfContainer">
+                      <p className="NameFinderPage__pdfLabel">
+                        Your invitation is ready
+                      </p>
+                      <div className="NameFinderPage__pdfActions">
+                        <a
+                          href={uploads[selectedGuest.table].dataUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="NameFinderPage__pdfLink NameFinderPage__pdfLink--view"
+                        >
+                          View PDF
+                        </a>
+                        <a
+                          href={uploads[selectedGuest.table].dataUrl}
+                          download={uploads[selectedGuest.table].name}
+                          className="NameFinderPage__pdfLink NameFinderPage__pdfLink--download"
+                        >
+                          Download PDF
+                        </a>
+                      </div>
                     </div>
                   ) : (
-                    <p className="NameFinderPage__noInvitation">
-                      No invitation available for your table ({guest.table})
-                    </p>
+                    <div className="NameFinderPage__fileContainer">
+                      <p className="NameFinderPage__fileName">{uploads[selectedGuest.table].name}</p>
+                      <a
+                        href={uploads[selectedGuest.table].dataUrl}
+                        download={uploads[selectedGuest.table].name}
+                        className="NameFinderPage__downloadLink"
+                      >
+                        Download Invitation
+                      </a>
+                    </div>
                   )}
                 </div>
-              );
-            })}
+              ) : (
+                <p className="NameFinderPage__noInvitation">
+                  No invitation available for your table ({selectedGuest.table})
+                </p>
+              )}
+            </div>
           </div>
-        ) : (
-          <p className="NameFinderPage__hint">
-            No guests matched the name you entered. Double-check your spelling or
-            contact the event coordinator.
-          </p>
         )}
       </section>
     </main>

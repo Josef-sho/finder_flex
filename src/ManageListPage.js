@@ -5,17 +5,8 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import * as XLSX from 'xlsx';
 import './ManageListPage.css';
-
-const hasMetadata = (row) =>
-  row.slice(1).some((value) => {
-    if (value === undefined || value === null) {
-      return false;
-    }
-    const text = value.toString().trim();
-    return text.length > 0;
-  });
+import { loadGuestListFromFile, parseExcelFile } from './utils/excelParser';
 
 export const GUEST_LIST_STORAGE_KEY = 'finder-flex:guest-list';
 
@@ -25,17 +16,36 @@ const ManageListPage = ({ onBack }) => {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    try {
-      const storedValue = window.localStorage.getItem(GUEST_LIST_STORAGE_KEY);
-      if (storedValue) {
-        const parsed = JSON.parse(storedValue);
-        if (Array.isArray(parsed)) {
-          setGuestList(parsed);
+    const loadGuestList = async () => {
+      // Try to load from Excel file first
+      const excelUrl = `${process.env.PUBLIC_URL || ''}/data/guest-list.xlsx`;
+      const guests = await loadGuestListFromFile(excelUrl);
+      
+      if (guests.length > 0) {
+        setGuestList(guests);
+        // Also save to localStorage as backup
+        try {
+          window.localStorage.setItem(GUEST_LIST_STORAGE_KEY, JSON.stringify(guests));
+        } catch (storageError) {
+          console.error('Failed to save guest list to storage', storageError);
+        }
+      } else {
+        // Fallback to localStorage if Excel file not found
+        try {
+          const storedValue = window.localStorage.getItem(GUEST_LIST_STORAGE_KEY);
+          if (storedValue) {
+            const parsed = JSON.parse(storedValue);
+            if (Array.isArray(parsed)) {
+              setGuestList(parsed);
+            }
+          }
+        } catch (storageError) {
+          console.error('Failed to load guest list from storage', storageError);
         }
       }
-    } catch (storageError) {
-      console.error('Failed to load guest list from storage', storageError);
-    }
+    };
+
+    loadGuestList();
   }, []);
 
   const handleUploadClick = useCallback(() => {
@@ -60,62 +70,7 @@ const ManageListPage = ({ onBack }) => {
       reader.onload = (e) => {
         try {
           const buffer = e.target?.result;
-          const workbook = XLSX.read(buffer, { type: 'array' });
-          const sheetName = workbook.SheetNames[0];
-          const sheet = workbook.Sheets[sheetName];
-          const rows = XLSX.utils.sheet_to_json(sheet, {
-            header: 1,
-            defval: '',
-            blankrows: false,
-          });
-
-          if (!rows.length) {
-            setGuestList([]);
-            setError('The uploaded file is empty.');
-            resetFileInput();
-            return;
-          }
-
-          let headerSeen = false;
-          let currentTable = '';
-          const guests = [];
-
-          rows.forEach((row) => {
-            const cells = row.map((cell) =>
-              cell === undefined || cell === null
-                ? ''
-                : cell.toString().trim()
-            );
-
-            const primary = cells[0];
-
-            if (!primary) {
-              return;
-            }
-
-            if (!headerSeen && /guest/i.test(primary)) {
-              headerSeen = true;
-              return;
-            }
-
-            if (!headerSeen) {
-              return;
-            }
-
-            if (/table/i.test(primary) && !hasMetadata(cells)) {
-              currentTable = primary;
-              return;
-            }
-
-            if (!hasMetadata(cells)) {
-              return;
-            }
-
-            guests.push({
-              name: primary,
-              table: currentTable || 'Unassigned',
-            });
-          });
+          const guests = parseExcelFile(buffer);
 
           if (!guests.length) {
             setGuestList([]);

@@ -65,4 +65,3 @@ const TableGuestsPage = () => {
 };
 
 export default TableGuestsPage;
-
