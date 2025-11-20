@@ -1,64 +1,80 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import './UploadInvitationsPage.css';
 import { GUEST_LIST_STORAGE_KEY } from './ManageListPage';
-import { loadInvitationsFromFile, exportInvitationsToFile } from './utils/invitationsLoader';
+import { loadGuestListFromFile } from './utils/excelParser';
+import { getInvitationForTable } from './utils/invitationLoader';
 
 const UploadInvitationsPage = ({ onBack }) => {
   const [guestList, setGuestList] = useState([]);
-  const [uploads, setUploads] = useState({});
-  const fileInputsRef = useRef({});
-
-  const uploadsStorageKey = useMemo(
-    () => `${GUEST_LIST_STORAGE_KEY}:uploads`,
-    []
-  );
+  const [invitations, setInvitations] = useState({});
 
   useEffect(() => {
-    const loadInvitations = async () => {
-      // Try to load from JSON file first
-      const invitationsUrl = `${process.env.PUBLIC_URL || ''}/data/invitations.json`;
-      const fileInvitations = await loadInvitationsFromFile(invitationsUrl);
+    const loadGuestList = async () => {
+      // Try to load from Excel file - try actual filename first, then fallback
+      const possibleFilenames = [
+        'Mr Tunde Martins AKande @60 Guest List.xlsx',
+        'guest-list.xlsx'
+      ];
       
-      if (fileInvitations) {
-        setUploads(fileInvitations);
+      let guests = [];
+      for (const filename of possibleFilenames) {
+        const excelUrl = `${process.env.PUBLIC_URL || ''}/data/${encodeURIComponent(filename)}`;
+        guests = await loadGuestListFromFile(excelUrl);
+        if (guests.length > 0) {
+          break; // Found a valid file
+        }
+      }
+      
+      if (guests.length > 0) {
+        setGuestList(guests);
         // Also save to localStorage as backup
         try {
-          window.localStorage.setItem(uploadsStorageKey, JSON.stringify(fileInvitations));
+          window.localStorage.setItem(GUEST_LIST_STORAGE_KEY, JSON.stringify(guests));
         } catch (storageError) {
-          console.error('Failed to save invitations to storage', storageError);
+          console.error('Failed to save guest list to storage', storageError);
         }
       } else {
-        // Fallback to localStorage if JSON file not found
+        // Fallback to localStorage if Excel file not found
         try {
-          const storedUploads = window.localStorage.getItem(uploadsStorageKey);
-          if (storedUploads) {
-            const parsed = JSON.parse(storedUploads);
-            if (parsed && typeof parsed === 'object') {
-              setUploads(parsed);
+          const storedValue = window.localStorage.getItem(GUEST_LIST_STORAGE_KEY);
+          if (storedValue) {
+            const parsed = JSON.parse(storedValue);
+            if (Array.isArray(parsed)) {
+              setGuestList(parsed);
             }
           }
         } catch (storageError) {
-          console.error('Failed to load invitation uploads from storage', storageError);
+          console.error('Failed to read guest list from storage', storageError);
         }
       }
     };
 
-    loadInvitations();
-  }, [uploadsStorageKey]);
+    loadGuestList();
+  }, []);
 
   useEffect(() => {
-    try {
-      const storedValue = window.localStorage.getItem(GUEST_LIST_STORAGE_KEY);
-      if (storedValue) {
-        const parsed = JSON.parse(storedValue);
-        if (Array.isArray(parsed)) {
-          setGuestList(parsed);
+    const loadInvitations = async () => {
+      if (guestList.length > 0) {
+        // Get unique table names
+        const tableNames = [...new Set(guestList.map(guest => guest.table).filter(Boolean))];
+        const loadedInvitations = {};
+        
+        // Check each table for an invitation file
+        for (const tableName of tableNames) {
+          const invitation = await getInvitationForTable(tableName);
+          if (invitation) {
+            loadedInvitations[tableName] = invitation;
+          }
         }
+        
+        setInvitations(loadedInvitations);
       }
-    } catch (storageError) {
-      console.error('Failed to read guest list from storage', storageError);
+    };
+
+    if (guestList.length > 0) {
+      loadInvitations();
     }
-  }, []);
+  }, [guestList]);
 
   const tables = useMemo(() => {
     const tableMap = new Map();
@@ -75,76 +91,10 @@ const UploadInvitationsPage = ({ onBack }) => {
       .map(([name, guests]) => ({
         name,
         count: guests.length,
+        hasInvitation: !!invitations[name],
       }))
       .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
-  }, [guestList]);
-
-  const handleSelectFile = (tableName) => {
-    if (fileInputsRef.current[tableName]) {
-      fileInputsRef.current[tableName].click();
-    }
-  };
-
-  const handleFileChange = (tableName, event) => {
-    const file = event.target.files?.[0];
-    if (!file) {
-      return;
-    }
-
-    const reader = new FileReader();
-
-    reader.onload = (e) => {
-      const fileUrl = e.target?.result;
-      if (!fileUrl || typeof fileUrl !== 'string') {
-        return;
-      }
-
-      const tableUpload = {
-        name: file.name,
-        size: file.size,
-        type: file.type,
-        uploadedAt: new Date().toISOString(),
-        dataUrl: fileUrl,
-      };
-
-      setUploads((prev) => {
-        const next = {
-          ...prev,
-          [tableName]: tableUpload,
-        };
-
-        try {
-          window.localStorage.setItem(uploadsStorageKey, JSON.stringify(next));
-        } catch (storageError) {
-          console.error('Failed to persist invitation upload', storageError);
-        }
-
-        return next;
-      });
-    };
-
-    reader.readAsDataURL(file);
-
-    // reset the input so the same file can be re-uploaded
-    event.target.value = '';
-  };
-
-  const handleClearUpload = (tableName) => {
-    setUploads((prev) => {
-      const next = { ...prev };
-      delete next[tableName];
-      try {
-        window.localStorage.setItem(uploadsStorageKey, JSON.stringify(next));
-      } catch (storageError) {
-        console.error('Failed to update stored uploads', storageError);
-      }
-      return next;
-    });
-  };
-
-  const handleExportInvitations = () => {
-    exportInvitationsToFile(uploads, 'invitations.json');
-  };
+  }, [guestList, invitations]);
 
   return (
     <main className="UploadInvitationsPage">
@@ -156,34 +106,21 @@ const UploadInvitationsPage = ({ onBack }) => {
         >
           ← Back
         </button>
-        <h1 className="UploadInvitationsPage__title">Upload Invitations</h1>
-        {Object.keys(uploads).length > 0 && (
-          <button
-            type="button"
-            className="UploadInvitationsPage__export"
-            onClick={handleExportInvitations}
-            title="Export invitations to save for all devices"
-          >
-            Export Invitations
-          </button>
-        )}
+        <h1 className="UploadInvitationsPage__title">Invitations</h1>
       </header>
 
-      {Object.keys(uploads).length > 0 && (
-        <section className="UploadInvitationsPage__info">
-          <p className="UploadInvitationsPage__infoText">
-            <strong>To make invitations available on all devices:</strong> Click "Export Invitations" above, 
-            then place the downloaded <code>invitations.json</code> file in the <code>public/data/</code> folder 
-            and rebuild the app. This will make invitations accessible from any device.
-          </p>
-        </section>
-      )}
+      <section className="UploadInvitationsPage__info">
+        <p className="UploadInvitationsPage__infoText">
+          <strong>How to add invitations:</strong> Place invitation files in <code>public/data/invitations/</code> 
+          named by table (e.g., <code>Table 1.pdf</code>, <code>Table 2.png</code>). 
+          Supported formats: PDF, PNG, JPG, JPEG. After adding files, rebuild the app.
+        </p>
+      </section>
 
       {guestList.length === 0 ? (
         <section className="UploadInvitationsPage__status">
           <p>
-            No guest list found. Upload a list first so we can generate table
-            upload buttons.
+            No guest list found. Upload a list first so we can show table information.
           </p>
         </section>
       ) : (
@@ -194,47 +131,32 @@ const UploadInvitationsPage = ({ onBack }) => {
               <p className="UploadInvitationsPage__cardMeta">
                 {table.count} guest{table.count === 1 ? '' : 's'}
               </p>
-              <div className="UploadInvitationsPage__actions">
-                <button
-                  type="button"
-                  className="UploadInvitationsPage__upload"
-                  onClick={() => handleSelectFile(table.name)}
-                >
-                  {uploads[table.name] ? 'Replace File' : 'Upload Invitations'}
-                </button>
-                {uploads[table.name] ? (
-                  <button
-                    type="button"
-                    className="UploadInvitationsPage__clear"
-                    onClick={() => handleClearUpload(table.name)}
-                  >
-                    Remove
-                  </button>
-                ) : null}
+              <div className="UploadInvitationsPage__status">
+                {table.hasInvitation ? (
+                  <div className="UploadInvitationsPage__statusBadge UploadInvitationsPage__statusBadge--success">
+                    ✓ Invitation Available
+                  </div>
+                ) : (
+                  <div className="UploadInvitationsPage__statusBadge UploadInvitationsPage__statusBadge--missing">
+                    No Invitation
+                  </div>
+                )}
               </div>
-              {uploads[table.name] ? (
+              {table.hasInvitation && invitations[table.name] && (
                 <div className="UploadInvitationsPage__fileInfo">
                   <p className="UploadInvitationsPage__fileName">
-                    {uploads[table.name].name}
+                    {invitations[table.name].name}
                   </p>
                   <a
-                    href={uploads[table.name].dataUrl}
-                    download={uploads[table.name].name}
-                    className="UploadInvitationsPage__download"
+                    href={invitations[table.name].url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="UploadInvitationsPage__view"
                   >
-                    Download
+                    View
                   </a>
                 </div>
-              ) : null}
-              <input
-                ref={(node) => {
-                  fileInputsRef.current[table.name] = node;
-                }}
-                type="file"
-                accept=".pdf,.png,.jpg,.jpeg,image/png,image/jpeg,application/pdf"
-                className="UploadInvitationsPage__fileInput"
-                onChange={(event) => handleFileChange(table.name, event)}
-              />
+              )}
             </article>
           ))}
         </section>
@@ -244,4 +166,3 @@ const UploadInvitationsPage = ({ onBack }) => {
 };
 
 export default UploadInvitationsPage;
-

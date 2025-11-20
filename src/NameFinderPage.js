@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import './NameFinderPage.css';
 import { GUEST_LIST_STORAGE_KEY } from './ManageListPage';
 import { loadGuestListFromFile } from './utils/excelParser';
-import { loadInvitationsFromFile } from './utils/invitationsLoader';
+import { loadAllInvitations } from './utils/invitationLoader';
 
 const HERO_IMAGE_FILENAME = 'CELEBRANT IMAGE.png';
 const HERO_IMAGE_URL = `${process.env.PUBLIC_URL || ''}/images/${encodeURIComponent(
@@ -63,11 +63,6 @@ const NameFinderPage = () => {
   const [query, setQuery] = useState('');
   const [selectedGuest, setSelectedGuest] = useState(null);
 
-  const uploadsStorageKey = useMemo(
-    () => `${GUEST_LIST_STORAGE_KEY}:uploads`,
-    []
-  );
-
   useEffect(() => {
     const loadGuestList = async () => {
       // Try to load from Excel file - try actual filename first, then fallback
@@ -114,36 +109,19 @@ const NameFinderPage = () => {
 
   useEffect(() => {
     const loadInvitations = async () => {
-      // Try to load from JSON file first
-      const invitationsUrl = `${process.env.PUBLIC_URL || ''}/data/invitations.json`;
-      const fileInvitations = await loadInvitationsFromFile(invitationsUrl);
-      
-      if (fileInvitations) {
-        setUploads(fileInvitations);
-        // Also save to localStorage as backup
-        try {
-          window.localStorage.setItem(uploadsStorageKey, JSON.stringify(fileInvitations));
-        } catch (storageError) {
-          console.error('Failed to save invitations to storage', storageError);
-        }
-      } else {
-        // Fallback to localStorage if JSON file not found
-        try {
-          const storedUploads = window.localStorage.getItem(uploadsStorageKey);
-          if (storedUploads) {
-            const parsed = JSON.parse(storedUploads);
-            if (parsed && typeof parsed === 'object') {
-              setUploads(parsed);
-            }
-          }
-        } catch (storageError) {
-          console.error('Failed to load invitation uploads from storage', storageError);
-        }
+      // Load invitations from public/data/invitations/ folder
+      if (guestList.length > 0) {
+        // Get unique table names
+        const tableNames = [...new Set(guestList.map(guest => guest.table).filter(Boolean))];
+        const invitations = await loadAllInvitations(tableNames);
+        setUploads(invitations);
       }
     };
 
-    loadInvitations();
-  }, [uploadsStorageKey]);
+    if (guestList.length > 0) {
+      loadInvitations();
+    }
+  }, [guestList]);
 
   const results = useMemo(() => {
     const trimmedQuery = query.trim();
@@ -304,26 +282,26 @@ const NameFinderPage = () => {
                   {uploads[selectedGuest.table]?.type?.startsWith('image/') ? (
                     <>
                       <img
-                        src={uploads[selectedGuest.table].dataUrl}
+                        src={uploads[selectedGuest.table].url}
                         alt={`Invitation for ${selectedGuest.name}`}
                         className="NameFinderPage__invitationImage"
                       />
                       <a
-                        href={uploads[selectedGuest.table].dataUrl}
+                        href={uploads[selectedGuest.table].url}
                         download={uploads[selectedGuest.table].name}
                         className="NameFinderPage__downloadButton"
                       >
                         Download Invitation
                       </a>
                     </>
-                  ) : uploads[selectedGuest.table]?.type === 'application/pdf' ? (
+                  ) : uploads[selectedGuest.table]?.type === 'application/pdf' || uploads[selectedGuest.table]?.url?.endsWith('.pdf') ? (
                     <div className="NameFinderPage__pdfContainer">
                       <p className="NameFinderPage__pdfLabel">
                         Your invitation is ready
                       </p>
                       <div className="NameFinderPage__pdfActions">
                         <a
-                          href={uploads[selectedGuest.table].dataUrl}
+                          href={uploads[selectedGuest.table].url}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="NameFinderPage__pdfLink NameFinderPage__pdfLink--view"
@@ -331,7 +309,7 @@ const NameFinderPage = () => {
                           View PDF
                         </a>
                         <a
-                          href={uploads[selectedGuest.table].dataUrl}
+                          href={uploads[selectedGuest.table].url}
                           download={uploads[selectedGuest.table].name}
                           className="NameFinderPage__pdfLink NameFinderPage__pdfLink--download"
                         >
@@ -343,7 +321,7 @@ const NameFinderPage = () => {
                     <div className="NameFinderPage__fileContainer">
                       <p className="NameFinderPage__fileName">{uploads[selectedGuest.table].name}</p>
                       <a
-                        href={uploads[selectedGuest.table].dataUrl}
+                        href={uploads[selectedGuest.table].url}
                         download={uploads[selectedGuest.table].name}
                         className="NameFinderPage__downloadLink"
                       >
