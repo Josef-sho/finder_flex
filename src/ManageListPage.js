@@ -7,6 +7,7 @@ import React, {
 } from 'react';
 import './ManageListPage.css';
 import { loadGuestListFromFile, parseExcelFile } from './utils/excelParser';
+import { loadGuestsFromSupabase, saveGuestsToSupabase, clearAllGuestsFromSupabase, clearAllInvitationsFromSupabase } from './utils/supabaseGuests';
 
 export const GUEST_LIST_STORAGE_KEY = 'finder-flex:guest-list';
 
@@ -17,7 +18,22 @@ const ManageListPage = ({ onBack }) => {
 
   useEffect(() => {
     const loadGuestList = async () => {
-      // Try to load from Excel file - try actual filename first, then fallback
+      // Try Supabase first
+      const supabaseGuests = await loadGuestsFromSupabase();
+      
+      if (supabaseGuests !== null && supabaseGuests.length > 0) {
+        // Use Supabase data
+        setGuestList(supabaseGuests);
+        // Also save to localStorage as backup
+        try {
+          window.localStorage.setItem(GUEST_LIST_STORAGE_KEY, JSON.stringify(supabaseGuests));
+        } catch (storageError) {
+          console.error('Failed to save guest list to storage', storageError);
+        }
+        return;
+      }
+
+      // Fallback to Excel file if Supabase not configured or empty
       const possibleFilenames = [
         'Mr Tunde Martins AKande @60 Guest List.xlsx',
         'guest-list.xlsx'
@@ -78,7 +94,7 @@ const ManageListPage = ({ onBack }) => {
 
       const reader = new FileReader();
 
-      reader.onload = (e) => {
+      reader.onload = async (e) => {
         try {
           const buffer = e.target?.result;
           const guests = parseExcelFile(buffer);
@@ -91,6 +107,14 @@ const ManageListPage = ({ onBack }) => {
           } else {
             setGuestList(guests);
             setError('');
+            
+            // Save to Supabase if configured
+            const savedToSupabase = await saveGuestsToSupabase(guests);
+            if (savedToSupabase) {
+              console.log('Guest list saved to Supabase');
+            }
+            
+            // Also save to localStorage as backup
             try {
               window.localStorage.setItem(
                 GUEST_LIST_STORAGE_KEY,
@@ -131,6 +155,29 @@ const ManageListPage = ({ onBack }) => {
     []
   );
 
+  const handleClear = useCallback(async () => {
+    if (!window.confirm('Are you sure you want to clear all guests and invitations? This cannot be undone.')) {
+      return;
+    }
+
+    // Clear guests and invitations from Supabase
+    await clearAllGuestsFromSupabase();
+    await clearAllInvitationsFromSupabase();
+
+    // Clear from localStorage
+    try {
+      window.localStorage.removeItem(GUEST_LIST_STORAGE_KEY);
+      const uploadsKey = `${GUEST_LIST_STORAGE_KEY}:uploads`;
+      window.localStorage.removeItem(uploadsKey);
+    } catch (storageError) {
+      console.error('Failed to clear guest list from storage', storageError);
+    }
+
+    // Clear state
+    setGuestList([]);
+    setError('');
+  }, []);
+
   return (
     <main className="ManageListPage">
       <header className="ManageListPage__header">
@@ -149,8 +196,17 @@ const ManageListPage = ({ onBack }) => {
           <>
             <div className="ManageListPage__info">
               <p className="ManageListPage__infoText">
-                Guest list loaded from Excel file. You can upload a new file to replace it.
+                Guest list loaded. You can upload a new file to replace it or clear the list.
               </p>
+            </div>
+            <div className="ManageListPage__actions">
+              <button
+                type="button"
+                className="ManageListPage__clearButton"
+                onClick={handleClear}
+              >
+                Clear All Guests
+              </button>
             </div>
             <div className="ManageListPage__tableWrapper">
               <table className="ManageListPage__table">

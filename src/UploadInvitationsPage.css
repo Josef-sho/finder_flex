@@ -188,6 +188,13 @@
   box-shadow: 0 10px 20px rgba(45, 108, 223, 0.25);
 }
 
+.UploadInvitationsPage__upload:disabled {
+  background-color: #9ca3af;
+  cursor: not-allowed;
+  opacity: 0.6;
+  box-shadow: none;
+}
+
 .UploadInvitationsPage__clear {
   margin-top: auto;
   padding: 0.6rem 1rem;

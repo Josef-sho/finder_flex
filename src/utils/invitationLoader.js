@@ -18,6 +18,7 @@ export const getInvitationForTable = async (tableName) => {
   if (!tableName) return null;
 
   const normalizedTable = normalizeTableName(tableName);
+  // Use relative path that works in both dev and production
   const baseUrl = `${process.env.PUBLIC_URL || ''}/data/invitations/`;
   
   // Try common file extensions
@@ -31,9 +32,20 @@ export const getInvitationForTable = async (tableName) => {
       const response = await fetch(url, { method: 'HEAD' });
       if (response.ok) {
         const contentType = response.headers.get('content-type') || '';
+        // Determine type from extension if content-type is not available
+        let fileType = contentType;
+        if (!fileType || fileType === 'application/octet-stream') {
+          if (ext === '.pdf') {
+            fileType = 'application/pdf';
+          } else if (ext === '.png') {
+            fileType = 'image/png';
+          } else if (ext === '.jpg' || ext === '.jpeg') {
+            fileType = 'image/jpeg';
+          }
+        }
         return {
           url,
-          type: contentType,
+          type: fileType,
           name: `${normalizedTable}${ext}`,
         };
       }

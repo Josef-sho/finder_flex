@@ -1,16 +1,34 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import './UploadInvitationsPage.css';
 import { GUEST_LIST_STORAGE_KEY } from './ManageListPage';
 import { loadGuestListFromFile } from './utils/excelParser';
 import { getInvitationForTable } from './utils/invitationLoader';
+import { loadGuestsFromSupabase, loadInvitationsFromSupabase, saveInvitationToSupabase, deleteInvitationFromSupabase } from './utils/supabaseGuests';
 
 const UploadInvitationsPage = ({ onBack }) => {
   const [guestList, setGuestList] = useState([]);
   const [invitations, setInvitations] = useState({});
+  const fileInputsRef = useRef({});
+  const [uploading, setUploading] = useState({});
 
   useEffect(() => {
     const loadGuestList = async () => {
-      // Try to load from Excel file - try actual filename first, then fallback
+      // Try Supabase first
+      const supabaseGuests = await loadGuestsFromSupabase();
+      
+      if (supabaseGuests !== null && supabaseGuests.length > 0) {
+        // Use Supabase data
+        setGuestList(supabaseGuests);
+        // Also save to localStorage as backup
+        try {
+          window.localStorage.setItem(GUEST_LIST_STORAGE_KEY, JSON.stringify(supabaseGuests));
+        } catch (storageError) {
+          console.error('Failed to save guest list to storage', storageError);
+        }
+        return;
+      }
+
+      // Fallback to Excel file if Supabase not configured or empty
       const possibleFilenames = [
         'Mr Tunde Martins AKande @60 Guest List.xlsx',
         'guest-list.xlsx'
@@ -54,26 +72,33 @@ const UploadInvitationsPage = ({ onBack }) => {
 
   useEffect(() => {
     const loadInvitations = async () => {
-      if (guestList.length > 0) {
-        // Get unique table names
-        const tableNames = [...new Set(guestList.map(guest => guest.table).filter(Boolean))];
-        const loadedInvitations = {};
-        
-        // Check each table for an invitation file
-        for (const tableName of tableNames) {
-          const invitation = await getInvitationForTable(tableName);
-          if (invitation) {
-            loadedInvitations[tableName] = invitation;
-          }
-        }
-        
-        setInvitations(loadedInvitations);
+      if (guestList.length === 0) return;
+
+      // Try Supabase first
+      const supabaseInvitations = await loadInvitationsFromSupabase();
+      
+      if (supabaseInvitations !== null) {
+        // Use Supabase invitations
+        setInvitations(supabaseInvitations);
+        return;
       }
+
+      // Fallback to public folder if Supabase not configured
+      const tableNames = [...new Set(guestList.map(guest => guest.table).filter(Boolean))];
+      const loadedInvitations = {};
+      
+      // Check each table for an invitation file
+      for (const tableName of tableNames) {
+        const invitation = await getInvitationForTable(tableName);
+        if (invitation) {
+          loadedInvitations[tableName] = invitation;
+        }
+      }
+      
+      setInvitations(loadedInvitations);
     };
 
-    if (guestList.length > 0) {
-      loadInvitations();
-    }
+    loadInvitations();
   }, [guestList]);
 
   const tables = useMemo(() => {
@@ -96,6 +121,93 @@ const UploadInvitationsPage = ({ onBack }) => {
       .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
   }, [guestList, invitations]);
 
+  const handleSelectFile = (tableName) => {
+    if (fileInputsRef.current[tableName]) {
+      fileInputsRef.current[tableName].click();
+    }
+  };
+
+  const handleFileChange = async (tableName, event) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    setUploading(prev => ({ ...prev, [tableName]: true }));
+
+    const reader = new FileReader();
+
+    reader.onload = async (e) => {
+      const dataUrl = e.target?.result;
+      if (!dataUrl || typeof dataUrl !== 'string') {
+        setUploading(prev => ({ ...prev, [tableName]: false }));
+        return;
+      }
+
+      // Save to Supabase
+      const saved = await saveInvitationToSupabase(
+        tableName,
+        null, // file_url (not using external URLs)
+        file.type,
+        file.name,
+        dataUrl // Store as base64 data URL
+      );
+
+      if (saved) {
+        // Reload invitations to show the new one
+        const updatedInvitations = await loadInvitationsFromSupabase();
+        if (updatedInvitations !== null) {
+          setInvitations(updatedInvitations);
+        } else {
+          // Fallback: update local state
+          setInvitations(prev => ({
+            ...prev,
+            [tableName]: {
+              url: dataUrl,
+              type: file.type,
+              name: file.name,
+              dataUrl: dataUrl,
+            },
+          }));
+        }
+      }
+
+      setUploading(prev => ({ ...prev, [tableName]: false }));
+      // Reset file input
+      if (fileInputsRef.current[tableName]) {
+        fileInputsRef.current[tableName].value = '';
+      }
+    };
+
+    reader.onerror = () => {
+      setUploading(prev => ({ ...prev, [tableName]: false }));
+    };
+
+    reader.readAsDataURL(file);
+  };
+
+  const handleClearInvitation = async (tableName) => {
+    if (!window.confirm(`Are you sure you want to remove the invitation for ${tableName}?`)) {
+      return;
+    }
+
+    const deleted = await deleteInvitationFromSupabase(tableName);
+    if (deleted) {
+      // Reload invitations
+      const updatedInvitations = await loadInvitationsFromSupabase();
+      if (updatedInvitations !== null) {
+        setInvitations(updatedInvitations);
+      } else {
+        // Fallback: update local state
+        setInvitations(prev => {
+          const next = { ...prev };
+          delete next[tableName];
+          return next;
+        });
+      }
+    }
+  };
+
   return (
     <main className="UploadInvitationsPage">
       <header className="UploadInvitationsPage__header">
@@ -111,9 +223,8 @@ const UploadInvitationsPage = ({ onBack }) => {
 
       <section className="UploadInvitationsPage__info">
         <p className="UploadInvitationsPage__infoText">
-          <strong>How to add invitations:</strong> Place invitation files in <code>public/data/invitations/</code> 
-          named by table (e.g., <code>Table 1.pdf</code>, <code>Table 2.png</code>). 
-          Supported formats: PDF, PNG, JPG, JPEG. After adding files, rebuild the app.
+          <strong>Upload invitations:</strong> Click "Upload Invitation" for each table to add invitation files. 
+          Supported formats: PDF, PNG, JPG, JPEG. Invitations are saved to Supabase and available on all devices.
         </p>
       </section>
 
@@ -142,13 +253,32 @@ const UploadInvitationsPage = ({ onBack }) => {
                   </div>
                 )}
               </div>
+              <div className="UploadInvitationsPage__actions">
+                <button
+                  type="button"
+                  className="UploadInvitationsPage__upload"
+                  onClick={() => handleSelectFile(table.name)}
+                  disabled={uploading[table.name]}
+                >
+                  {uploading[table.name] ? 'Uploading...' : (table.hasInvitation ? 'Replace Invitation' : 'Upload Invitation')}
+                </button>
+                {table.hasInvitation && (
+                  <button
+                    type="button"
+                    className="UploadInvitationsPage__clear"
+                    onClick={() => handleClearInvitation(table.name)}
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
               {table.hasInvitation && invitations[table.name] && (
                 <div className="UploadInvitationsPage__fileInfo">
                   <p className="UploadInvitationsPage__fileName">
                     {invitations[table.name].name}
                   </p>
                   <a
-                    href={invitations[table.name].url}
+                    href={invitations[table.name].url || invitations[table.name].dataUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="UploadInvitationsPage__view"
@@ -157,6 +287,15 @@ const UploadInvitationsPage = ({ onBack }) => {
                   </a>
                 </div>
               )}
+              <input
+                ref={(node) => {
+                  fileInputsRef.current[table.name] = node;
+                }}
+                type="file"
+                accept=".pdf,.png,.jpg,.jpeg,image/png,image/jpeg,application/pdf"
+                className="UploadInvitationsPage__fileInput"
+                onChange={(event) => handleFileChange(table.name, event)}
+              />
             </article>
           ))}
         </section>

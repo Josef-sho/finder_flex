@@ -3,6 +3,8 @@ import './NameFinderPage.css';
 import { GUEST_LIST_STORAGE_KEY } from './ManageListPage';
 import { loadGuestListFromFile } from './utils/excelParser';
 import { loadAllInvitations } from './utils/invitationLoader';
+import { downloadFile } from './utils/downloadHelper';
+import { loadGuestsFromSupabase, loadInvitationsFromSupabase } from './utils/supabaseGuests';
 
 const HERO_IMAGE_FILENAME = 'CELEBRANT IMAGE.png';
 const HERO_IMAGE_URL = `${process.env.PUBLIC_URL || ''}/images/${encodeURIComponent(
@@ -65,7 +67,22 @@ const NameFinderPage = () => {
 
   useEffect(() => {
     const loadGuestList = async () => {
-      // Try to load from Excel file - try actual filename first, then fallback
+      // Try Supabase first
+      const supabaseGuests = await loadGuestsFromSupabase();
+      
+      if (supabaseGuests !== null && supabaseGuests.length > 0) {
+        // Use Supabase data
+        setGuestList(supabaseGuests);
+        // Also save to localStorage as backup
+        try {
+          window.localStorage.setItem(GUEST_LIST_STORAGE_KEY, JSON.stringify(supabaseGuests));
+        } catch (storageError) {
+          console.error('Failed to save guest list to storage', storageError);
+        }
+        return;
+      }
+
+      // Fallback to Excel file if Supabase not configured or empty
       const possibleFilenames = [
         'Mr Tunde Martins AKande @60 Guest List.xlsx',
         'guest-list.xlsx'
@@ -109,18 +126,24 @@ const NameFinderPage = () => {
 
   useEffect(() => {
     const loadInvitations = async () => {
-      // Load invitations from public/data/invitations/ folder
-      if (guestList.length > 0) {
-        // Get unique table names
-        const tableNames = [...new Set(guestList.map(guest => guest.table).filter(Boolean))];
-        const invitations = await loadAllInvitations(tableNames);
-        setUploads(invitations);
+      if (guestList.length === 0) return;
+
+      // Try Supabase first
+      const supabaseInvitations = await loadInvitationsFromSupabase();
+      
+      if (supabaseInvitations !== null) {
+        // Use Supabase invitations
+        setUploads(supabaseInvitations);
+        return;
       }
+
+      // Fallback to public folder if Supabase not configured
+      const tableNames = [...new Set(guestList.map(guest => guest.table).filter(Boolean))];
+      const invitations = await loadAllInvitations(tableNames);
+      setUploads(invitations);
     };
 
-    if (guestList.length > 0) {
-      loadInvitations();
-    }
+    loadInvitations();
   }, [guestList]);
 
   const results = useMemo(() => {
@@ -279,20 +302,21 @@ const NameFinderPage = () => {
               <h2 className="NameFinderPage__guestName">{selectedGuest.name}</h2>
               {uploads[selectedGuest.table] ? (
                 <div className="NameFinderPage__invitation">
-                  {uploads[selectedGuest.table]?.type?.startsWith('image/') ? (
+                  {uploads[selectedGuest.table]?.type?.startsWith('image/') || 
+                   /\.(png|jpg|jpeg)$/i.test(uploads[selectedGuest.table]?.url || '') ? (
                     <>
                       <img
                         src={uploads[selectedGuest.table].url}
                         alt={`Invitation for ${selectedGuest.name}`}
                         className="NameFinderPage__invitationImage"
                       />
-                      <a
-                        href={uploads[selectedGuest.table].url}
-                        download={uploads[selectedGuest.table].name}
+                      <button
+                        type="button"
+                        onClick={() => downloadFile(uploads[selectedGuest.table].url, uploads[selectedGuest.table].name)}
                         className="NameFinderPage__downloadButton"
                       >
                         Download Invitation
-                      </a>
+                      </button>
                     </>
                   ) : uploads[selectedGuest.table]?.type === 'application/pdf' || uploads[selectedGuest.table]?.url?.endsWith('.pdf') ? (
                     <div className="NameFinderPage__pdfContainer">
@@ -308,25 +332,25 @@ const NameFinderPage = () => {
                         >
                           View PDF
                         </a>
-                        <a
-                          href={uploads[selectedGuest.table].url}
-                          download={uploads[selectedGuest.table].name}
+                        <button
+                          type="button"
+                          onClick={() => downloadFile(uploads[selectedGuest.table].url, uploads[selectedGuest.table].name)}
                           className="NameFinderPage__pdfLink NameFinderPage__pdfLink--download"
                         >
                           Download PDF
-                        </a>
+                        </button>
                       </div>
                     </div>
                   ) : (
                     <div className="NameFinderPage__fileContainer">
                       <p className="NameFinderPage__fileName">{uploads[selectedGuest.table].name}</p>
-                      <a
-                        href={uploads[selectedGuest.table].url}
-                        download={uploads[selectedGuest.table].name}
+                      <button
+                        type="button"
+                        onClick={() => downloadFile(uploads[selectedGuest.table].url, uploads[selectedGuest.table].name)}
                         className="NameFinderPage__downloadLink"
                       >
                         Download Invitation
-                      </a>
+                      </button>
                     </div>
                   )}
                 </div>

@@ -134,6 +134,38 @@
   line-height: 1.5;
 }
 
+.ManageListPage__actions {
+  margin-bottom: 1rem;
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-start;
+}
+
+.ManageListPage__clearButton {
+  padding: 0.75rem 1.5rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  border: none;
+  border-radius: 0.5rem;
+  background-color: #dc2626;
+  color: #ffffff;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.2);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.ManageListPage__clearButton:hover,
+.ManageListPage__clearButton:focus {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(220, 38, 38, 0.25);
+  background-color: #b91c1c;
+}
+
+.ManageListPage__clearButton:active {
+  transform: translateY(0);
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.2);
+}
+
 .ManageListPage__uploadSection {
   margin-top: 1.5rem;
   display: flex;
