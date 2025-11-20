@@ -19,8 +19,8 @@ const normalizeValue = (value) =>
 
 // Stricter matching: requires query to match at the start of the name or start of words
 const isVerySimilar = (name, query) => {
-  if (!query || query.length < 7) {
-    return false; // Require at least 7 characters
+  if (!query || query.length < 9) {
+    return false; // Require at least 9 characters
   }
 
   const normalizedName = normalizeValue(name);
@@ -127,8 +127,8 @@ const NameFinderPage = () => {
 
   const results = useMemo(() => {
     const trimmedQuery = query.trim();
-    if (!trimmedQuery || trimmedQuery.length < 7) {
-      return []; // Require at least 7 characters before showing suggestions
+    if (!trimmedQuery || trimmedQuery.length < 9) {
+      return []; // Require at least 9 characters before showing suggestions
     }
 
     return guestList.filter((guest) => {
