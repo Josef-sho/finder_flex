@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import './NameFinderPage.css';
 import { GUEST_LIST_STORAGE_KEY } from './ManageListPage';
 import { loadGuestListFromFile } from './utils/excelParser';
+import { loadInvitationsFromFile } from './utils/invitationsLoader';
 
 const HERO_IMAGE_FILENAME = 'CELEBRANT IMAGE.png';
 const HERO_IMAGE_URL = `${process.env.PUBLIC_URL || ''}/images/${encodeURIComponent(
@@ -112,17 +113,36 @@ const NameFinderPage = () => {
   }, []);
 
   useEffect(() => {
-    try {
-      const storedUploads = window.localStorage.getItem(uploadsStorageKey);
-      if (storedUploads) {
-        const parsed = JSON.parse(storedUploads);
-        if (parsed && typeof parsed === 'object') {
-          setUploads(parsed);
+    const loadInvitations = async () => {
+      // Try to load from JSON file first
+      const invitationsUrl = `${process.env.PUBLIC_URL || ''}/data/invitations.json`;
+      const fileInvitations = await loadInvitationsFromFile(invitationsUrl);
+      
+      if (fileInvitations) {
+        setUploads(fileInvitations);
+        // Also save to localStorage as backup
+        try {
+          window.localStorage.setItem(uploadsStorageKey, JSON.stringify(fileInvitations));
+        } catch (storageError) {
+          console.error('Failed to save invitations to storage', storageError);
+        }
+      } else {
+        // Fallback to localStorage if JSON file not found
+        try {
+          const storedUploads = window.localStorage.getItem(uploadsStorageKey);
+          if (storedUploads) {
+            const parsed = JSON.parse(storedUploads);
+            if (parsed && typeof parsed === 'object') {
+              setUploads(parsed);
+            }
+          }
+        } catch (storageError) {
+          console.error('Failed to load invitation uploads from storage', storageError);
         }
       }
-    } catch (storageError) {
-      console.error('Failed to load invitation uploads from storage', storageError);
-    }
+    };
+
+    loadInvitations();
   }, [uploadsStorageKey]);
 
   const results = useMemo(() => {

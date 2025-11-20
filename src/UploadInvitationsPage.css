@@ -12,6 +12,33 @@
   display: flex;
   align-items: center;
   gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.UploadInvitationsPage__export {
+  margin-left: auto;
+  padding: 0.6rem 1.25rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  border: none;
+  border-radius: 0.5rem;
+  background-color: #10b981;
+  color: #ffffff;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
+}
+
+.UploadInvitationsPage__export:hover,
+.UploadInvitationsPage__export:focus {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(16, 185, 129, 0.3);
+  background-color: #059669;
+}
+
+.UploadInvitationsPage__export:active {
+  transform: translateY(0);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
 }
 
 .UploadInvitationsPage__back {
@@ -35,6 +62,28 @@
   background-color: #f4f6fb;
   color: #41506c;
   line-height: 1.5;
+}
+
+.UploadInvitationsPage__info {
+  padding: 1rem 1.25rem;
+  background-color: #e0f2fe;
+  border-radius: 0.75rem;
+  border: 1px solid #7dd3fc;
+}
+
+.UploadInvitationsPage__infoText {
+  margin: 0;
+  color: #0c4a6e;
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.UploadInvitationsPage__infoText code {
+  background-color: rgba(255, 255, 255, 0.7);
+  padding: 0.2rem 0.4rem;
+  border-radius: 0.25rem;
+  font-size: 0.85em;
+  font-family: 'Courier New', monospace;
 }
 
 .UploadInvitationsPage__grid {

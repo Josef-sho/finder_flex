@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import './UploadInvitationsPage.css';
 import { GUEST_LIST_STORAGE_KEY } from './ManageListPage';
+import { loadInvitationsFromFile, exportInvitationsToFile } from './utils/invitationsLoader';
 
 const UploadInvitationsPage = ({ onBack }) => {
   const [guestList, setGuestList] = useState([]);
@@ -13,17 +14,36 @@ const UploadInvitationsPage = ({ onBack }) => {
   );
 
   useEffect(() => {
-    try {
-      const storedUploads = window.localStorage.getItem(uploadsStorageKey);
-      if (storedUploads) {
-        const parsed = JSON.parse(storedUploads);
-        if (parsed && typeof parsed === 'object') {
-          setUploads(parsed);
+    const loadInvitations = async () => {
+      // Try to load from JSON file first
+      const invitationsUrl = `${process.env.PUBLIC_URL || ''}/data/invitations.json`;
+      const fileInvitations = await loadInvitationsFromFile(invitationsUrl);
+      
+      if (fileInvitations) {
+        setUploads(fileInvitations);
+        // Also save to localStorage as backup
+        try {
+          window.localStorage.setItem(uploadsStorageKey, JSON.stringify(fileInvitations));
+        } catch (storageError) {
+          console.error('Failed to save invitations to storage', storageError);
+        }
+      } else {
+        // Fallback to localStorage if JSON file not found
+        try {
+          const storedUploads = window.localStorage.getItem(uploadsStorageKey);
+          if (storedUploads) {
+            const parsed = JSON.parse(storedUploads);
+            if (parsed && typeof parsed === 'object') {
+              setUploads(parsed);
+            }
+          }
+        } catch (storageError) {
+          console.error('Failed to load invitation uploads from storage', storageError);
         }
       }
-    } catch (storageError) {
-      console.error('Failed to load invitation uploads from storage', storageError);
-    }
+    };
+
+    loadInvitations();
   }, [uploadsStorageKey]);
 
   useEffect(() => {
@@ -122,6 +142,10 @@ const UploadInvitationsPage = ({ onBack }) => {
     });
   };
 
+  const handleExportInvitations = () => {
+    exportInvitationsToFile(uploads, 'invitations.json');
+  };
+
   return (
     <main className="UploadInvitationsPage">
       <header className="UploadInvitationsPage__header">
@@ -133,7 +157,27 @@ const UploadInvitationsPage = ({ onBack }) => {
           ← Back
         </button>
         <h1 className="UploadInvitationsPage__title">Upload Invitations</h1>
+        {Object.keys(uploads).length > 0 && (
+          <button
+            type="button"
+            className="UploadInvitationsPage__export"
+            onClick={handleExportInvitations}
+            title="Export invitations to save for all devices"
+          >
+            Export Invitations
+          </button>
+        )}
       </header>
+
+      {Object.keys(uploads).length > 0 && (
+        <section className="UploadInvitationsPage__info">
+          <p className="UploadInvitationsPage__infoText">
+            <strong>To make invitations available on all devices:</strong> Click "Export Invitations" above, 
+            then place the downloaded <code>invitations.json</code> file in the <code>public/data/</code> folder 
+            and rebuild the app. This will make invitations accessible from any device.
+          </p>
+        </section>
+      )}
 
       {guestList.length === 0 ? (
         <section className="UploadInvitationsPage__status">
