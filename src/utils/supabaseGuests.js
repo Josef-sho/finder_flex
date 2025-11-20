@@ -2,7 +2,7 @@ import { supabase, TABLES, isSupabaseConfigured } from '../config/supabase';
 
 /**
  * Loads all guests from Supabase
- * @returns {Promise<Array<{name: string, table: string}>>}
+ * @returns {Promise<Array<{name: string, table: string}>|null>} Returns array if Supabase is configured (even if empty), null if not configured
  */
 export const loadGuestsFromSupabase = async () => {
   if (!isSupabaseConfigured() || !supabase) {
@@ -21,7 +21,7 @@ export const loadGuestsFromSupabase = async () => {
       return null;
     }
 
-    // Map to expected format
+    // Map to expected format - return empty array if no data (Supabase is configured but empty)
     return (data || []).map(guest => ({
       name: guest.name,
       table: guest.table_name,

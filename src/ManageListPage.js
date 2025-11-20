@@ -21,8 +21,8 @@ const ManageListPage = ({ onBack }) => {
       // Try Supabase first
       const supabaseGuests = await loadGuestsFromSupabase();
       
-      if (supabaseGuests !== null && supabaseGuests.length > 0) {
-        // Use Supabase data
+      // If Supabase is configured (even if empty), use it and don't fall back
+      if (supabaseGuests !== null) {
         setGuestList(supabaseGuests);
         // Also save to localStorage as backup
         try {
@@ -30,10 +30,10 @@ const ManageListPage = ({ onBack }) => {
         } catch (storageError) {
           console.error('Failed to save guest list to storage', storageError);
         }
-        return;
+        return; // Don't fall back to Excel if Supabase is configured
       }
 
-      // Fallback to Excel file if Supabase not configured or empty
+      // Fallback to Excel file only if Supabase is not configured
       const possibleFilenames = [
         'Mr Tunde Martins AKande @60 Guest List.xlsx',
         'guest-list.xlsx'
@@ -172,6 +172,9 @@ const ManageListPage = ({ onBack }) => {
     } catch (storageError) {
       console.error('Failed to clear guest list from storage', storageError);
     }
+
+    // Reload to show empty state (Supabase will return empty array, not fall back to Excel)
+    window.location.reload();
 
     // Clear state
     setGuestList([]);
