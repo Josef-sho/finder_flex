@@ -17,9 +17,20 @@ const ManageListPage = ({ onBack }) => {
 
   useEffect(() => {
     const loadGuestList = async () => {
-      // Try to load from Excel file first
-      const excelUrl = `${process.env.PUBLIC_URL || ''}/data/guest-list.xlsx`;
-      const guests = await loadGuestListFromFile(excelUrl);
+      // Try to load from Excel file - try actual filename first, then fallback
+      const possibleFilenames = [
+        'Mr Tunde Martins AKande @60 Guest List.xlsx',
+        'guest-list.xlsx'
+      ];
+      
+      let guests = [];
+      for (const filename of possibleFilenames) {
+        const excelUrl = `${process.env.PUBLIC_URL || ''}/data/${encodeURIComponent(filename)}`;
+        guests = await loadGuestListFromFile(excelUrl);
+        if (guests.length > 0) {
+          break; // Found a valid file
+        }
+      }
       
       if (guests.length > 0) {
         setGuestList(guests);
@@ -135,30 +146,37 @@ const ManageListPage = ({ onBack }) => {
             {error}
           </div>
         ) : guestList.length ? (
-          <div className="ManageListPage__tableWrapper">
-            <table className="ManageListPage__table">
-              <thead>
-                <tr>
-                  {displayColumns.map((column) => (
-                    <th key={column.key} scope="col">
-                      {column.label}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {guestList.map((guest, index) => (
-                  <tr key={`${guest.name}-${index}`}>
+          <>
+            <div className="ManageListPage__info">
+              <p className="ManageListPage__infoText">
+                Guest list loaded from Excel file. You can upload a new file to replace it.
+              </p>
+            </div>
+            <div className="ManageListPage__tableWrapper">
+              <table className="ManageListPage__table">
+                <thead>
+                  <tr>
                     {displayColumns.map((column) => (
-                      <td key={column.key}>
-                        {guest[column.key] || '—'}
-                      </td>
+                      <th key={column.key} scope="col">
+                        {column.label}
+                      </th>
                     ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {guestList.map((guest, index) => (
+                    <tr key={`${guest.name}-${index}`}>
+                      {displayColumns.map((column) => (
+                        <td key={column.key}>
+                          {guest[column.key] || '—'}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         ) : (
           <div className="ManageListPage__status">
             <p>
@@ -186,13 +204,17 @@ const ManageListPage = ({ onBack }) => {
         onChange={handleFileChange}
       />
 
-      <button
-        type="button"
-        className="ManageListPage__upload"
-        onClick={handleUploadClick}
-      >
-        Upload List
-      </button>
+      {guestList.length > 0 && (
+        <div className="ManageListPage__uploadSection">
+          <button
+            type="button"
+            className="ManageListPage__upload"
+            onClick={handleUploadClick}
+          >
+            Upload New List
+          </button>
+        </div>
+      )}
     </main>
   );
 };

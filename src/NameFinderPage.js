@@ -19,8 +19,8 @@ const normalizeValue = (value) =>
 
 // Stricter matching: requires query to match at the start of the name or start of words
 const isVerySimilar = (name, query) => {
-  if (!query || query.length < 3) {
-    return false; // Require at least 3 characters
+  if (!query || query.length < 7) {
+    return false; // Require at least 7 characters
   }
 
   const normalizedName = normalizeValue(name);
@@ -69,9 +69,20 @@ const NameFinderPage = () => {
 
   useEffect(() => {
     const loadGuestList = async () => {
-      // Try to load from Excel file first
-      const excelUrl = `${process.env.PUBLIC_URL || ''}/data/guest-list.xlsx`;
-      const guests = await loadGuestListFromFile(excelUrl);
+      // Try to load from Excel file - try actual filename first, then fallback
+      const possibleFilenames = [
+        'Mr Tunde Martins AKande @60 Guest List.xlsx',
+        'guest-list.xlsx'
+      ];
+      
+      let guests = [];
+      for (const filename of possibleFilenames) {
+        const excelUrl = `${process.env.PUBLIC_URL || ''}/data/${encodeURIComponent(filename)}`;
+        guests = await loadGuestListFromFile(excelUrl);
+        if (guests.length > 0) {
+          break; // Found a valid file
+        }
+      }
       
       if (guests.length > 0) {
         setGuestList(guests);
@@ -116,8 +127,8 @@ const NameFinderPage = () => {
 
   const results = useMemo(() => {
     const trimmedQuery = query.trim();
-    if (!trimmedQuery || trimmedQuery.length < 3) {
-      return []; // Require at least 3 characters before showing suggestions
+    if (!trimmedQuery || trimmedQuery.length < 7) {
+      return []; // Require at least 7 characters before showing suggestions
     }
 
     return guestList.filter((guest) => {
@@ -227,10 +238,6 @@ const NameFinderPage = () => {
             {query.trim() === '' ? (
               <p className="NameFinderPage__hint">
                 Start typing your name to see if you are on the guest list.
-              </p>
-            ) : query.trim().length < 3 ? (
-              <p className="NameFinderPage__hint">
-                Please type at least 3 characters to search.
               </p>
             ) : results.length ? (
               <div className="NameFinderPage__suggestions">
