@@ -17,22 +17,43 @@ const normalizeValue = (value) =>
     .toLowerCase()
     .replace(/[^a-z0-9]/g, '');
 
-const fuzzyIncludes = (target, query) => {
-  if (!query) {
+// Stricter matching: requires query to match at the start of the name or start of words
+const isVerySimilar = (name, query) => {
+  if (!query || query.length < 3) {
+    return false; // Require at least 3 characters
+  }
+
+  const normalizedName = normalizeValue(name);
+  const normalizedQuery = normalizeValue(query);
+
+  // Exact match at the start
+  if (normalizedName.startsWith(normalizedQuery)) {
     return true;
   }
 
-  let targetIndex = 0;
-  let queryIndex = 0;
-
-  while (targetIndex < target.length && queryIndex < query.length) {
-    if (target[targetIndex] === query[queryIndex]) {
-      queryIndex += 1;
+  // Match at the start of any word in the name
+  const words = normalizedName.split(/\s+/);
+  for (const word of words) {
+    if (word.startsWith(normalizedQuery)) {
+      return true;
     }
-    targetIndex += 1;
   }
 
-  return queryIndex === query.length;
+  // Very strict fuzzy match: query must match in order with minimal gaps
+  // Require at least 80% of query characters to match in sequence
+  let queryIndex = 0;
+  let matchedChars = 0;
+  
+  for (let i = 0; i < normalizedName.length && queryIndex < normalizedQuery.length; i++) {
+    if (normalizedName[i] === normalizedQuery[queryIndex]) {
+      matchedChars++;
+      queryIndex++;
+    }
+  }
+
+  // Require at least 80% match and query must be mostly consumed
+  const matchRatio = matchedChars / normalizedQuery.length;
+  return matchRatio >= 0.8 && queryIndex >= normalizedQuery.length * 0.8;
 };
 
 const NameFinderPage = () => {
@@ -94,20 +115,16 @@ const NameFinderPage = () => {
   }, [uploadsStorageKey]);
 
   const results = useMemo(() => {
-    if (!query.trim()) {
-      return [];
+    const trimmedQuery = query.trim();
+    if (!trimmedQuery || trimmedQuery.length < 3) {
+      return []; // Require at least 3 characters before showing suggestions
     }
 
-    const normalizedQuery = normalizeValue(query.trim());
     return guestList.filter((guest) => {
       if (!guest?.name) {
         return false;
       }
-      const normalizedName = normalizeValue(guest.name);
-      return (
-        normalizedName.includes(normalizedQuery) ||
-        fuzzyIncludes(normalizedName, normalizedQuery)
-      );
+      return isVerySimilar(guest.name, trimmedQuery);
     });
   }, [guestList, query]);
 
@@ -210,6 +227,10 @@ const NameFinderPage = () => {
             {query.trim() === '' ? (
               <p className="NameFinderPage__hint">
                 Start typing your name to see if you are on the guest list.
+              </p>
+            ) : query.trim().length < 3 ? (
+              <p className="NameFinderPage__hint">
+                Please type at least 3 characters to search.
               </p>
             ) : results.length ? (
               <div className="NameFinderPage__suggestions">
