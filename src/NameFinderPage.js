@@ -20,24 +20,49 @@ const normalizeValue = (value) =>
     .toLowerCase()
     .replace(/[^a-z0-9]/g, '');
 
-// Stricter matching: requires query to match at the start of the name or start of words
+// Stricter matching: requires query to match at the start of the name or any word (including last names)
+// Complete word matches (like full last names) work regardless of length
 const isVerySimilar = (name, query) => {
-  if (!query || query.length < 9) {
-    return false; // Require at least 9 characters
+  if (!query) {
+    return false;
   }
 
   const normalizedName = normalizeValue(name);
   const normalizedQuery = normalizeValue(query);
+  const words = normalizedName.split(/\s+/);
 
-  // Exact match at the start
+  // Check if query exactly matches any complete word (first name, last name, etc.)
+  // This allows short last names to work (e.g., "Smith" = 5 chars)
+  for (const word of words) {
+    if (word === normalizedQuery) {
+      return true; // Exact match of a complete word - always show
+    }
+  }
+
+  // For partial matches, require at least 9 characters
+  if (normalizedQuery.length < 9) {
+    return false;
+  }
+
+  // Exact match at the start of full name
   if (normalizedName.startsWith(normalizedQuery)) {
     return true;
   }
 
   // Match at the start of any word in the name
-  const words = normalizedName.split(/\s+/);
   for (const word of words) {
     if (word.startsWith(normalizedQuery)) {
+      return true;
+    }
+    // Also check if query matches anywhere in the word (for longer queries)
+    if (word.length >= normalizedQuery.length && word.includes(normalizedQuery)) {
+      return true;
+    }
+  }
+
+  // Check if any word contains the query (for last name matching)
+  for (const word of words) {
+    if (word.includes(normalizedQuery)) {
       return true;
     }
   }
@@ -148,9 +173,11 @@ const NameFinderPage = () => {
 
   const results = useMemo(() => {
     const trimmedQuery = query.trim();
-    if (!trimmedQuery || trimmedQuery.length < 9) {
-      return []; // Require at least 9 characters before showing suggestions
+    if (!trimmedQuery) {
+      return [];
     }
+    // Note: isVerySimilar handles the 9-character requirement for partial matches
+    // but allows complete word matches regardless of length
 
     return guestList.filter((guest) => {
       if (!guest?.name) {
