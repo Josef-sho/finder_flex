@@ -22,19 +22,26 @@ const normalizeValue = (value) =>
 
 // Stricter matching: requires query to match at the start of the name or any word (including last names)
 // Complete word matches (like full last names) work regardless of length
+// Handles hyphenated names like "Martins-Akande" by splitting on both spaces and hyphens
 const isVerySimilar = (name, query) => {
   if (!query) {
     return false;
   }
 
-  const normalizedName = normalizeValue(name);
+  // Split into words BEFORE normalizing, handling both spaces and hyphens
+  // This handles names like "John Martins-Akande" or "Mary-Jane Smith"
+  const nameWords = name
+    .split(/[\s-]+/) // Split on spaces and hyphens
+    .filter(w => w.trim().length > 0);
   const normalizedQuery = normalizeValue(query);
-  const words = normalizedName.split(/\s+/);
+  const normalizedName = normalizeValue(name);
 
   // Check if query exactly matches any complete word (first name, last name, etc.)
-  // This allows short last names to work (e.g., "Smith" = 5 chars)
-  for (const word of words) {
-    if (word === normalizedQuery) {
+  // This allows short last names to work (e.g., "Smith" = 5 chars, "Akande" = 6 chars)
+  // Normalize each word individually for comparison
+  for (const word of nameWords) {
+    const normalizedWord = normalizeValue(word);
+    if (normalizedWord === normalizedQuery) {
       return true; // Exact match of a complete word - always show
     }
   }
@@ -50,19 +57,21 @@ const isVerySimilar = (name, query) => {
   }
 
   // Match at the start of any word in the name
-  for (const word of words) {
-    if (word.startsWith(normalizedQuery)) {
+  for (const word of nameWords) {
+    const normalizedWord = normalizeValue(word);
+    if (normalizedWord.startsWith(normalizedQuery)) {
       return true;
     }
     // Also check if query matches anywhere in the word (for longer queries)
-    if (word.length >= normalizedQuery.length && word.includes(normalizedQuery)) {
+    if (normalizedWord.length >= normalizedQuery.length && normalizedWord.includes(normalizedQuery)) {
       return true;
     }
   }
 
   // Check if any word contains the query (for last name matching)
-  for (const word of words) {
-    if (word.includes(normalizedQuery)) {
+  for (const word of nameWords) {
+    const normalizedWord = normalizeValue(word);
+    if (normalizedWord.includes(normalizedQuery)) {
       return true;
     }
   }
