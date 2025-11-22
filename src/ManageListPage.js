@@ -7,7 +7,7 @@ import React, {
 } from 'react';
 import './ManageListPage.css';
 import { loadGuestListFromFile, parseExcelFile } from './utils/excelParser';
-import { loadGuestsFromSupabase, saveGuestsToSupabase, clearAllGuestsFromSupabase, clearAllInvitationsFromSupabase } from './utils/supabaseGuests';
+import { loadGuestsFromSupabase, saveGuestsToSupabase, clearAllGuestsFromSupabase, clearAllInvitationsFromSupabase, uncheckAllGuests } from './utils/supabaseGuests';
 
 export const GUEST_LIST_STORAGE_KEY = 'finder-flex:guest-list';
 
@@ -151,9 +151,30 @@ const ManageListPage = ({ onBack }) => {
     () => [
       { key: 'name', label: 'Guest' },
       { key: 'table', label: 'Table' },
+      { key: 'downloaded', label: 'Downloaded' },
     ],
     []
   );
+
+  const handleUncheckAll = useCallback(async () => {
+    if (!window.confirm('Are you sure you want to uncheck all downloaded invitations? This will allow all guests to download their invitations again.')) {
+      return;
+    }
+
+    const success = await uncheckAllGuests();
+    if (success) {
+      // Reload guest list to show updated status
+      const supabaseGuests = await loadGuestsFromSupabase();
+      if (supabaseGuests !== null) {
+        setGuestList(supabaseGuests);
+      } else {
+        // Update local state
+        setGuestList(prev => prev.map(g => ({ ...g, downloaded: false })));
+      }
+    } else {
+      setError('Failed to uncheck all guests. Check console for details.');
+    }
+  }, []);
 
   const handleClear = useCallback(async () => {
     if (!window.confirm('Are you sure you want to clear all guests and invitations? This cannot be undone.')) {
@@ -210,6 +231,13 @@ const ManageListPage = ({ onBack }) => {
               >
                 Clear All Guests
               </button>
+              <button
+                type="button"
+                className="ManageListPage__uncheckButton"
+                onClick={handleUncheckAll}
+              >
+                Uncheck All Downloads
+              </button>
             </div>
             <div className="ManageListPage__tableWrapper">
               <table className="ManageListPage__table">
@@ -225,11 +253,24 @@ const ManageListPage = ({ onBack }) => {
                 <tbody>
                   {guestList.map((guest, index) => (
                     <tr key={`${guest.name}-${index}`}>
-                      {displayColumns.map((column) => (
-                        <td key={column.key}>
-                          {guest[column.key] || '—'}
-                        </td>
-                      ))}
+                      {displayColumns.map((column) => {
+                        if (column.key === 'downloaded') {
+                          return (
+                            <td key={column.key} className="ManageListPage__checkCell">
+                              {guest.downloaded ? (
+                                <span className="ManageListPage__checkmark" aria-label="Downloaded">✓</span>
+                              ) : (
+                                <span className="ManageListPage__noCheck" aria-label="Not downloaded">—</span>
+                              )}
+                            </td>
+                          );
+                        }
+                        return (
+                          <td key={column.key}>
+                            {guest[column.key] || '—'}
+                          </td>
+                        );
+                      })}
                     </tr>
                   ))}
                 </tbody>

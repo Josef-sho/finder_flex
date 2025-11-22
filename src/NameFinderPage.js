@@ -4,7 +4,7 @@ import { GUEST_LIST_STORAGE_KEY } from './ManageListPage';
 import { loadGuestListFromFile } from './utils/excelParser';
 import { loadAllInvitations } from './utils/invitationLoader';
 import { downloadFile } from './utils/downloadHelper';
-import { loadGuestsFromSupabase, loadInvitationsFromSupabase } from './utils/supabaseGuests';
+import { loadGuestsFromSupabase, loadInvitationsFromSupabase, markGuestAsDownloaded } from './utils/supabaseGuests';
 
 const HERO_IMAGE_FILENAME = 'CELEBRANT IMAGE.png';
 const HERO_IMAGE_URL = `${process.env.PUBLIC_URL || ''}/images/${encodeURIComponent(
@@ -206,14 +206,32 @@ const NameFinderPage = () => {
     setSelectedGuest(guest);
   };
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
     // If there's exactly one result, select it
     if (results.length === 1 && !selectedGuest) {
-      setSelectedGuest(results[0]);
+      // Reload guest list to get latest downloaded status
+      const supabaseGuests = await loadGuestsFromSupabase();
+      if (supabaseGuests !== null) {
+        const updatedGuest = supabaseGuests.find(g => g.name === results[0].name);
+        setSelectedGuest(updatedGuest || results[0]);
+        // Update guest list with latest status
+        setGuestList(supabaseGuests);
+      } else {
+        setSelectedGuest(results[0]);
+      }
     } else if (results.length > 0 && query.trim()) {
       // If multiple results, select the first one
-      setSelectedGuest(results[0]);
+      // Reload guest list to get latest downloaded status
+      const supabaseGuests = await loadGuestsFromSupabase();
+      if (supabaseGuests !== null) {
+        const updatedGuest = supabaseGuests.find(g => g.name === results[0].name);
+        setSelectedGuest(updatedGuest || results[0]);
+        // Update guest list with latest status
+        setGuestList(supabaseGuests);
+      } else {
+        setSelectedGuest(results[0]);
+      }
     }
   };
 
@@ -348,10 +366,24 @@ const NameFinderPage = () => {
                       />
                       <button
                         type="button"
-                        onClick={() => downloadFile(uploads[selectedGuest.table].url, uploads[selectedGuest.table].name)}
+                        onClick={async () => {
+                          if (selectedGuest.downloaded) {
+                            alert('This invitation has already been downloaded.');
+                            return;
+                          }
+                          await downloadFile(uploads[selectedGuest.table].url, uploads[selectedGuest.table].name);
+                          // Mark as downloaded
+                          await markGuestAsDownloaded(selectedGuest.name);
+                          // Update local state
+                          setGuestList(prev => prev.map(g => 
+                            g.name === selectedGuest.name ? { ...g, downloaded: true } : g
+                          ));
+                          setSelectedGuest(prev => prev ? { ...prev, downloaded: true } : null);
+                        }}
                         className="NameFinderPage__downloadButton"
+                        disabled={selectedGuest?.downloaded}
                       >
-                        Download Invitation
+                        {selectedGuest?.downloaded ? 'Already Downloaded' : 'Download Invitation'}
                       </button>
                     </>
                   ) : uploads[selectedGuest.table]?.type === 'application/pdf' || uploads[selectedGuest.table]?.url?.endsWith('.pdf') ? (
@@ -370,10 +402,24 @@ const NameFinderPage = () => {
                         </a>
                         <button
                           type="button"
-                          onClick={() => downloadFile(uploads[selectedGuest.table].url, uploads[selectedGuest.table].name)}
+                          onClick={async () => {
+                            if (selectedGuest.downloaded) {
+                              alert('This invitation has already been downloaded.');
+                              return;
+                            }
+                            await downloadFile(uploads[selectedGuest.table].url, uploads[selectedGuest.table].name);
+                            // Mark as downloaded
+                            await markGuestAsDownloaded(selectedGuest.name);
+                            // Update local state
+                            setGuestList(prev => prev.map(g => 
+                              g.name === selectedGuest.name ? { ...g, downloaded: true } : g
+                            ));
+                            setSelectedGuest(prev => prev ? { ...prev, downloaded: true } : null);
+                          }}
                           className="NameFinderPage__pdfLink NameFinderPage__pdfLink--download"
+                          disabled={selectedGuest?.downloaded}
                         >
-                          Download PDF
+                          {selectedGuest?.downloaded ? 'Already Downloaded' : 'Download PDF'}
                         </button>
                       </div>
                     </div>
@@ -382,10 +428,24 @@ const NameFinderPage = () => {
                       <p className="NameFinderPage__fileName">{uploads[selectedGuest.table].name}</p>
                       <button
                         type="button"
-                        onClick={() => downloadFile(uploads[selectedGuest.table].url, uploads[selectedGuest.table].name)}
+                        onClick={async () => {
+                          if (selectedGuest.downloaded) {
+                            alert('This invitation has already been downloaded.');
+                            return;
+                          }
+                          await downloadFile(uploads[selectedGuest.table].url, uploads[selectedGuest.table].name);
+                          // Mark as downloaded
+                          await markGuestAsDownloaded(selectedGuest.name);
+                          // Update local state
+                          setGuestList(prev => prev.map(g => 
+                            g.name === selectedGuest.name ? { ...g, downloaded: true } : g
+                          ));
+                          setSelectedGuest(prev => prev ? { ...prev, downloaded: true } : null);
+                        }}
                         className="NameFinderPage__downloadLink"
+                        disabled={selectedGuest?.downloaded}
                       >
-                        Download Invitation
+                        {selectedGuest?.downloaded ? 'Already Downloaded' : 'Download Invitation'}
                       </button>
                     </div>
                   )}

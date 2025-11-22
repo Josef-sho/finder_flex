@@ -196,3 +196,49 @@
   box-shadow: 0 4px 12px rgba(45, 108, 223, 0.2);
 }
 
+.ManageListPage__uncheckButton {
+  padding: 0.75rem 1.5rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  border: none;
+  border-radius: 0.5rem;
+  background-color: #f59e0b;
+  color: #ffffff;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.2);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.ManageListPage__uncheckButton:hover,
+.ManageListPage__uncheckButton:focus {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(245, 158, 11, 0.25);
+  background-color: #d97706;
+}
+
+.ManageListPage__uncheckButton:active {
+  transform: translateY(0);
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.2);
+}
+
+.ManageListPage__checkCell {
+  text-align: center;
+}
+
+.ManageListPage__checkmark {
+  display: inline-block;
+  width: 24px;
+  height: 24px;
+  line-height: 24px;
+  border-radius: 50%;
+  background-color: #10b981;
+  color: #ffffff;
+  font-weight: bold;
+  font-size: 14px;
+}
+
+.ManageListPage__noCheck {
+  color: #9ca3af;
+  font-size: 1.2rem;
+}
+

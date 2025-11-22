@@ -25,6 +25,7 @@ export const loadGuestsFromSupabase = async () => {
     return (data || []).map(guest => ({
       name: guest.name,
       table: guest.table_name,
+      downloaded: guest.downloaded || false,
     }));
   } catch (err) {
     console.error('Error loading guests:', err);
@@ -58,6 +59,7 @@ export const saveGuestsToSupabase = async (guests) => {
       const guestsToInsert = guests.map(guest => ({
         name: guest.name,
         table_name: guest.table,
+        downloaded: guest.downloaded || false,
       }));
 
       const { error: insertError } = await supabase
@@ -253,6 +255,61 @@ export const clearAllInvitationsFromSupabase = async () => {
     return true;
   } catch (err) {
     console.error('Error clearing invitations:', err);
+    return false;
+  }
+};
+
+/**
+ * Marks a guest as having downloaded their invitation
+ * @param {string} guestName - The guest's name
+ * @returns {Promise<boolean>}
+ */
+export const markGuestAsDownloaded = async (guestName) => {
+  if (!isSupabaseConfigured() || !supabase) {
+    return false;
+  }
+
+  try {
+    const { error } = await supabase
+      .from(TABLES.GUESTS)
+      .update({ downloaded: true })
+      .eq('name', guestName);
+
+    if (error) {
+      console.error('Error marking guest as downloaded:', error);
+      return false;
+    }
+
+    return true;
+  } catch (err) {
+    console.error('Error marking guest as downloaded:', err);
+    return false;
+  }
+};
+
+/**
+ * Unchecks all guests (sets downloaded to false for all)
+ * @returns {Promise<boolean>}
+ */
+export const uncheckAllGuests = async () => {
+  if (!isSupabaseConfigured() || !supabase) {
+    return false;
+  }
+
+  try {
+    const { error } = await supabase
+      .from(TABLES.GUESTS)
+      .update({ downloaded: false })
+      .neq('id', 0); // Update all rows
+
+    if (error) {
+      console.error('Error unchecking all guests:', error);
+      return false;
+    }
+
+    return true;
+  } catch (err) {
+    console.error('Error unchecking all guests:', err);
     return false;
   }
 };
