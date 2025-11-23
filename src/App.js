@@ -12,7 +12,7 @@ import AdminPage from './AdminPage';
 import ManageListPage from './ManageListPage';
 import UploadInvitationsPage from './UploadInvitationsPage';
 import NameFinderPage from './NameFinderPage';
-import TableGuestsPage from './TableGuestsPage';
+// import TableGuestsPage from './TableGuestsPage'; // Disabled
 
 const ADMIN_SECRET_PATH = '/admin-9083securepanel';
 const GATE_STORAGE_KEY = 'nf-admin-auth';
@@ -110,9 +110,9 @@ function App() {
     <div className="App">
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<NameFinderPage />} />
-          <Route path="/tables/:tableNumber" element={<TableGuestsPage />} />
-          <Route path={`${ADMIN_SECRET_PATH}/*`} element={<AdminGate />}>
+              <Route path="/" element={<NameFinderPage />} />
+              {/* <Route path="/tables/:tableNumber" element={<TableGuestsPage />} /> */}
+              <Route path={`${ADMIN_SECRET_PATH}/*`} element={<AdminGate />}>
             <Route index element={<AdminDashboard />} />
             <Route path="manage" element={<ManageListRoute />} />
             <Route path="upload" element={<UploadInvitationsRoute />} />
