@@ -218,7 +218,7 @@ const NameFinderPage = () => {
         // Update guest list with latest status
         setGuestList(supabaseGuests);
       } else {
-        setSelectedGuest(results[0]);
+        setSelectedGuest({ ...results[0], downloaded: false });
       }
     } else if (results.length > 0 && query.trim()) {
       // If multiple results, select the first one
@@ -226,11 +226,11 @@ const NameFinderPage = () => {
       const supabaseGuests = await loadGuestsFromSupabase();
       if (supabaseGuests !== null) {
         const updatedGuest = supabaseGuests.find(g => g.name === results[0].name);
-        setSelectedGuest(updatedGuest || results[0]);
+        setSelectedGuest(updatedGuest || { ...results[0], downloaded: false });
         // Update guest list with latest status
         setGuestList(supabaseGuests);
       } else {
-        setSelectedGuest(results[0]);
+        setSelectedGuest({ ...results[0], downloaded: false });
       }
     }
   };
@@ -354,13 +354,31 @@ const NameFinderPage = () => {
             </button>
             <div className="NameFinderPage__result">
               <h2 className="NameFinderPage__guestName">{selectedGuest.name}</h2>
-              {uploads[selectedGuest.table] ? (
+              {(() => {
+                // Try to find invitation with flexible matching
+                const guestTable = selectedGuest.table;
+                let invitation = uploads[guestTable];
+                
+                // If not found, try normalized versions
+                if (!invitation && guestTable) {
+                  const normalized = guestTable.toLowerCase().trim();
+                  invitation = uploads[normalized] || uploads[guestTable.trim()];
+                  
+                  // Try extracting just the number
+                  const numberMatch = guestTable.match(/(\d+)/);
+                  if (!invitation && numberMatch) {
+                    const number = numberMatch[1];
+                    invitation = uploads[number] || uploads[`Table ${number}`] || uploads[`table ${number}`];
+                  }
+                }
+                
+                return invitation ? (
                 <div className="NameFinderPage__invitation">
-                  {uploads[selectedGuest.table]?.type?.startsWith('image/') || 
-                   /\.(png|jpg|jpeg)$/i.test(uploads[selectedGuest.table]?.url || '') ? (
+                  {invitation?.type?.startsWith('image/') || 
+                   /\.(png|jpg|jpeg)$/i.test(invitation?.url || '') ? (
                     <>
                       <img
-                        src={uploads[selectedGuest.table].url}
+                        src={invitation.url}
                         alt={`Invitation for ${selectedGuest.name}`}
                         className="NameFinderPage__invitationImage"
                       />
@@ -371,14 +389,25 @@ const NameFinderPage = () => {
                             alert('This invitation has already been downloaded.');
                             return;
                           }
-                          await downloadFile(uploads[selectedGuest.table].url, uploads[selectedGuest.table].name);
-                          // Mark as downloaded
-                          await markGuestAsDownloaded(selectedGuest.name);
-                          // Update local state
-                          setGuestList(prev => prev.map(g => 
-                            g.name === selectedGuest.name ? { ...g, downloaded: true } : g
-                          ));
-                          setSelectedGuest(prev => prev ? { ...prev, downloaded: true } : null);
+                          // Use dataUrl if available (for base64), otherwise use url
+                          const fileUrl = invitation.dataUrl || invitation.url;
+                          const fileName = invitation.name || `invitation-${selectedGuest.table}.pdf`;
+                          
+                          try {
+                            await downloadFile(fileUrl, fileName);
+                            // Mark as downloaded only after successful download
+                            const marked = await markGuestAsDownloaded(selectedGuest.name);
+                            if (marked) {
+                              // Update local state
+                              setGuestList(prev => prev.map(g => 
+                                g.name === selectedGuest.name ? { ...g, downloaded: true } : g
+                              ));
+                              setSelectedGuest(prev => prev ? { ...prev, downloaded: true } : null);
+                            }
+                          } catch (error) {
+                            console.error('Download failed:', error);
+                            alert('Failed to download invitation. Please try again.');
+                          }
                         }}
                         className="NameFinderPage__downloadButton"
                         disabled={selectedGuest?.downloaded}
@@ -386,14 +415,14 @@ const NameFinderPage = () => {
                         {selectedGuest?.downloaded ? 'Already Downloaded' : 'Download Invitation'}
                       </button>
                     </>
-                  ) : uploads[selectedGuest.table]?.type === 'application/pdf' || uploads[selectedGuest.table]?.url?.endsWith('.pdf') ? (
+                  ) : invitation?.type === 'application/pdf' || invitation?.url?.endsWith('.pdf') ? (
                     <div className="NameFinderPage__pdfContainer">
                       <p className="NameFinderPage__pdfLabel">
                         Your invitation is ready
                       </p>
                       <div className="NameFinderPage__pdfActions">
                         <a
-                          href={uploads[selectedGuest.table].url}
+                          href={invitation.url}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="NameFinderPage__pdfLink NameFinderPage__pdfLink--view"
@@ -407,14 +436,25 @@ const NameFinderPage = () => {
                               alert('This invitation has already been downloaded.');
                               return;
                             }
-                            await downloadFile(uploads[selectedGuest.table].url, uploads[selectedGuest.table].name);
-                            // Mark as downloaded
-                            await markGuestAsDownloaded(selectedGuest.name);
-                            // Update local state
-                            setGuestList(prev => prev.map(g => 
-                              g.name === selectedGuest.name ? { ...g, downloaded: true } : g
-                            ));
-                            setSelectedGuest(prev => prev ? { ...prev, downloaded: true } : null);
+                            // Use dataUrl if available (for base64), otherwise use url
+                            const fileUrl = invitation.dataUrl || invitation.url;
+                            const fileName = invitation.name || `invitation-${selectedGuest.table}.pdf`;
+                            
+                            try {
+                              await downloadFile(fileUrl, fileName);
+                              // Mark as downloaded only after successful download
+                              const marked = await markGuestAsDownloaded(selectedGuest.name);
+                              if (marked) {
+                                // Update local state
+                                setGuestList(prev => prev.map(g => 
+                                  g.name === selectedGuest.name ? { ...g, downloaded: true } : g
+                                ));
+                                setSelectedGuest(prev => prev ? { ...prev, downloaded: true } : null);
+                              }
+                            } catch (error) {
+                              console.error('Download failed:', error);
+                              alert('Failed to download invitation. Please try again.');
+                            }
                           }}
                           className="NameFinderPage__pdfLink NameFinderPage__pdfLink--download"
                           disabled={selectedGuest?.downloaded}
@@ -425,7 +465,7 @@ const NameFinderPage = () => {
                     </div>
                   ) : (
                     <div className="NameFinderPage__fileContainer">
-                      <p className="NameFinderPage__fileName">{uploads[selectedGuest.table].name}</p>
+                      <p className="NameFinderPage__fileName">{invitation.name}</p>
                       <button
                         type="button"
                         onClick={async () => {
@@ -433,14 +473,25 @@ const NameFinderPage = () => {
                             alert('This invitation has already been downloaded.');
                             return;
                           }
-                          await downloadFile(uploads[selectedGuest.table].url, uploads[selectedGuest.table].name);
-                          // Mark as downloaded
-                          await markGuestAsDownloaded(selectedGuest.name);
-                          // Update local state
-                          setGuestList(prev => prev.map(g => 
-                            g.name === selectedGuest.name ? { ...g, downloaded: true } : g
-                          ));
-                          setSelectedGuest(prev => prev ? { ...prev, downloaded: true } : null);
+                          // Use dataUrl if available (for base64), otherwise use url
+                          const fileUrl = invitation.dataUrl || invitation.url;
+                          const fileName = invitation.name || `invitation-${selectedGuest.table}`;
+                          
+                          try {
+                            await downloadFile(fileUrl, fileName);
+                            // Mark as downloaded only after successful download
+                            const marked = await markGuestAsDownloaded(selectedGuest.name);
+                            if (marked) {
+                              // Update local state
+                              setGuestList(prev => prev.map(g => 
+                                g.name === selectedGuest.name ? { ...g, downloaded: true } : g
+                              ));
+                              setSelectedGuest(prev => prev ? { ...prev, downloaded: true } : null);
+                            }
+                          } catch (error) {
+                            console.error('Download failed:', error);
+                            alert('Failed to download invitation. Please try again.');
+                          }
                         }}
                         className="NameFinderPage__downloadLink"
                         disabled={selectedGuest?.downloaded}
@@ -454,7 +505,8 @@ const NameFinderPage = () => {
                 <p className="NameFinderPage__noInvitation">
                   No invitation available for your table ({selectedGuest.table})
                 </p>
-              )}
+              );
+              })()}
             </div>
           </div>
         )}

@@ -99,14 +99,39 @@ export const loadInvitationsFromSupabase = async () => {
     }
 
     // Convert array to object keyed by table name
+    // Store both exact match and normalized versions for flexible matching
     const invitations = {};
     (data || []).forEach((invitation) => {
-      invitations[invitation.table_name] = {
+      const tableName = invitation.table_name;
+      const normalizedTableName = tableName.toLowerCase().trim();
+      
+      // Store with exact table name
+      invitations[tableName] = {
         url: invitation.file_url || invitation.data_url, // Use file_url or fallback to data_url
         type: invitation.file_type,
         name: invitation.file_name,
         dataUrl: invitation.data_url, // For base64 encoded files
       };
+      
+      // Also store normalized version for case-insensitive matching
+      if (normalizedTableName !== tableName.toLowerCase()) {
+        invitations[normalizedTableName] = invitations[tableName];
+      }
+      
+      // Store variations like "Table 14" and "14"
+      const tableNumberMatch = tableName.match(/(\d+)/);
+      if (tableNumberMatch) {
+        const number = tableNumberMatch[1];
+        // Store as "Table X" if it's just a number
+        if (/^\d+$/i.test(tableName.trim())) {
+          invitations[`Table ${number}`] = invitations[tableName];
+          invitations[`table ${number}`] = invitations[tableName];
+        }
+        // Store as just the number if it's "Table X"
+        if (/^table\s*\d+$/i.test(tableName.trim())) {
+          invitations[number] = invitations[tableName];
+        }
+      }
     });
 
     return invitations;
