@@ -223,34 +223,55 @@ const NameFinderPage = () => {
 
   const handleSuggestionClick = (guest) => {
     setQuery(guest.name);
-    setSelectedGuest(guest);
+    // Check download status from localStorage (works even when Supabase is disabled)
+    const downloadedNames = getDownloadedGuests();
+    const downloaded = downloadedNames.includes(guest.name);
+    setSelectedGuest({ ...guest, downloaded });
   };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
     // If there's exactly one result, select it
     if (results.length === 1 && !selectedGuest) {
-      // Reload guest list to get latest downloaded status
+      const guest = results[0];
+      // Check download status from localStorage (works even when Supabase is disabled)
+      const downloadedNames = getDownloadedGuests();
+      const downloaded = downloadedNames.includes(guest.name);
+      
+      // Also try Supabase if configured
       const supabaseGuests = await loadGuestsFromSupabase();
       if (supabaseGuests !== null) {
-        const updatedGuest = supabaseGuests.find(g => g.name === results[0].name);
-        setSelectedGuest(updatedGuest || results[0]);
+        const supabaseGuest = supabaseGuests.find(g => g.name === guest.name);
+        const finalDownloaded = supabaseGuest?.downloaded === true || downloaded;
+        setSelectedGuest({ ...guest, downloaded: finalDownloaded });
         // Update guest list with latest status
-        setGuestList(supabaseGuests);
+        setGuestList(supabaseGuests.map(g => ({
+          ...g,
+          downloaded: g.downloaded === true || downloadedNames.includes(g.name)
+        })));
       } else {
-        setSelectedGuest({ ...results[0], downloaded: false });
+        setSelectedGuest({ ...guest, downloaded });
       }
     } else if (results.length > 0 && query.trim()) {
       // If multiple results, select the first one
-      // Reload guest list to get latest downloaded status
+      const guest = results[0];
+      // Check download status from localStorage (works even when Supabase is disabled)
+      const downloadedNames = getDownloadedGuests();
+      const downloaded = downloadedNames.includes(guest.name);
+      
+      // Also try Supabase if configured
       const supabaseGuests = await loadGuestsFromSupabase();
       if (supabaseGuests !== null) {
-        const updatedGuest = supabaseGuests.find(g => g.name === results[0].name);
-        setSelectedGuest(updatedGuest || { ...results[0], downloaded: false });
+        const supabaseGuest = supabaseGuests.find(g => g.name === guest.name);
+        const finalDownloaded = supabaseGuest?.downloaded === true || downloaded;
+        setSelectedGuest({ ...guest, downloaded: finalDownloaded });
         // Update guest list with latest status
-        setGuestList(supabaseGuests);
+        setGuestList(supabaseGuests.map(g => ({
+          ...g,
+          downloaded: g.downloaded === true || downloadedNames.includes(g.name)
+        })));
       } else {
-        setSelectedGuest({ ...results[0], downloaded: false });
+        setSelectedGuest({ ...guest, downloaded });
       }
     }
   };
