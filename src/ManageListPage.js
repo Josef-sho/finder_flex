@@ -7,7 +7,7 @@ import React, {
 } from 'react';
 import './ManageListPage.css';
 import { loadGuestListFromFile, parseExcelFile } from './utils/excelParser';
-import { loadGuestsFromSupabase, saveGuestsToSupabase, clearAllGuestsFromSupabase, clearAllInvitationsFromSupabase, uncheckAllGuests } from './utils/supabaseGuests';
+import { loadGuestsFromSupabase, saveGuestsToSupabase, clearAllGuestsFromSupabase, clearAllInvitationsFromSupabase, uncheckAllGuests, getDownloadedGuests } from './utils/supabaseGuests';
 
 export const GUEST_LIST_STORAGE_KEY = 'finder-flex:guest-list';
 
@@ -49,10 +49,17 @@ const ManageListPage = ({ onBack }) => {
       }
       
       if (guests.length > 0) {
-        setGuestList(guests);
+        // Load download status from localStorage
+        const downloadedNames = getDownloadedGuests();
+        const guestsWithStatus = guests.map(guest => ({
+          ...guest,
+          downloaded: downloadedNames.includes(guest.name)
+        }));
+        
+        setGuestList(guestsWithStatus);
         // Also save to localStorage as backup
         try {
-          window.localStorage.setItem(GUEST_LIST_STORAGE_KEY, JSON.stringify(guests));
+          window.localStorage.setItem(GUEST_LIST_STORAGE_KEY, JSON.stringify(guestsWithStatus));
         } catch (storageError) {
           console.error('Failed to save guest list to storage', storageError);
         }
@@ -63,7 +70,13 @@ const ManageListPage = ({ onBack }) => {
           if (storedValue) {
             const parsed = JSON.parse(storedValue);
             if (Array.isArray(parsed)) {
-              setGuestList(parsed);
+              // Ensure download status is loaded
+              const downloadedNames = getDownloadedGuests();
+              const guestsWithStatus = parsed.map(guest => ({
+                ...guest,
+                downloaded: downloadedNames.includes(guest.name)
+              }));
+              setGuestList(guestsWithStatus);
             }
           }
         } catch (storageError) {
@@ -157,24 +170,28 @@ const ManageListPage = ({ onBack }) => {
   );
 
   const handleUncheckAll = useCallback(async () => {
-    if (!window.confirm('Are you sure you want to uncheck all downloaded invitations? This will allow all guests to download their invitations again.')) {
+    if (!window.confirm('Are you sure you want to reset all download statuses? This will allow all guests to download their invitations again.')) {
       return;
     }
 
     const success = await uncheckAllGuests();
     if (success) {
-      // Reload guest list to show updated status
-      const supabaseGuests = await loadGuestsFromSupabase();
-      if (supabaseGuests !== null) {
-        setGuestList(supabaseGuests);
-      } else {
-        // Update local state
-        setGuestList(prev => prev.map(g => ({ ...g, downloaded: false })));
+      // Update local state to reflect cleared download status
+      setGuestList(prev => prev.map(g => ({ ...g, downloaded: false })));
+      
+      // Also update localStorage backup to reflect the change
+      try {
+        const updatedList = guestList.map(g => ({ ...g, downloaded: false }));
+        window.localStorage.setItem(GUEST_LIST_STORAGE_KEY, JSON.stringify(updatedList));
+      } catch (storageError) {
+        console.error('Failed to update guest list in storage', storageError);
       }
+      
+      setError('');
     } else {
-      setError('Failed to uncheck all guests. Check console for details.');
+      setError('Failed to reset download statuses. Check console for details.');
     }
-  }, []);
+  }, [guestList]);
 
   const handleClear = useCallback(async () => {
     if (!window.confirm('Are you sure you want to clear all guests and invitations? This cannot be undone.')) {
@@ -236,7 +253,7 @@ const ManageListPage = ({ onBack }) => {
                 className="ManageListPage__uncheckButton"
                 onClick={handleUncheckAll}
               >
-                Uncheck All Downloads
+                Reset All Downloads
               </button>
             </div>
             <div className="ManageListPage__tableWrapper">
