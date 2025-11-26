@@ -23,6 +23,12 @@ const extractDescriptiveName = (tableName) => {
     return descriptive;
   }
 
+  const tablePattern = /^table\s*\d+\s*(.+)$/i;
+  const tableMatch = tableName.match(tablePattern);
+  if (tableMatch && tableMatch[1]) {
+    return tableMatch[1].trim().toUpperCase();
+  }
+
   return null;
 };
 
