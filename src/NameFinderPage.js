@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import './NameFinderPage.css';
 import { GUEST_LIST_STORAGE_KEY } from './ManageListPage';
 import { loadGuestListFromFile } from './utils/excelParser';
-import { loadAllInvitations } from './utils/invitationLoader';
+import { loadAllInvitations, findInvitationInMap } from './utils/invitationLoader';
 import { downloadFile } from './utils/downloadHelper';
 import { loadGuestsFromSupabase, loadInvitationsFromSupabase, markGuestAsDownloaded } from './utils/supabaseGuests';
 
@@ -355,22 +355,8 @@ const NameFinderPage = () => {
             <div className="NameFinderPage__result">
               <h2 className="NameFinderPage__guestName">{selectedGuest.name}</h2>
               {(() => {
-                // Try to find invitation with flexible matching
                 const guestTable = selectedGuest.table;
-                let invitation = uploads[guestTable];
-                
-                // If not found, try normalized versions
-                if (!invitation && guestTable) {
-                  const normalized = guestTable.toLowerCase().trim();
-                  invitation = uploads[normalized] || uploads[guestTable.trim()];
-                  
-                  // Try extracting just the number
-                  const numberMatch = guestTable.match(/(\d+)/);
-                  if (!invitation && numberMatch) {
-                    const number = numberMatch[1];
-                    invitation = uploads[number] || uploads[`Table ${number}`] || uploads[`table ${number}`];
-                  }
-                }
+                const invitation = findInvitationInMap(guestTable, uploads);
                 
                 return invitation ? (
                 <div className="NameFinderPage__invitation">

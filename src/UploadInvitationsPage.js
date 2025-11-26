@@ -1,58 +1,38 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import './UploadInvitationsPage.css';
 import { GUEST_LIST_STORAGE_KEY } from './ManageListPage';
 import { loadGuestListFromFile } from './utils/excelParser';
-import { getInvitationForTable } from './utils/invitationLoader';
-import { loadGuestsFromSupabase, loadInvitationsFromSupabase, saveInvitationToSupabase, deleteInvitationFromSupabase } from './utils/supabaseGuests';
+import { loadAllInvitations, findInvitationInMap } from './utils/invitationLoader';
 
 const UploadInvitationsPage = ({ onBack }) => {
   const [guestList, setGuestList] = useState([]);
   const [invitations, setInvitations] = useState({});
-  const fileInputsRef = useRef({});
-  const [uploading, setUploading] = useState({});
+  const [loadingInvites, setLoadingInvites] = useState(false);
 
   useEffect(() => {
     const loadGuestList = async () => {
-      // Try Supabase first
-      const supabaseGuests = await loadGuestsFromSupabase();
-      
-      // If Supabase is configured (even if empty), use it and don't fall back
-      if (supabaseGuests !== null) {
-        setGuestList(supabaseGuests);
-        // Also save to localStorage as backup
-        try {
-          window.localStorage.setItem(GUEST_LIST_STORAGE_KEY, JSON.stringify(supabaseGuests));
-        } catch (storageError) {
-          console.error('Failed to save guest list to storage', storageError);
-        }
-        return; // Don't fall back to Excel if Supabase is configured
-      }
-
-      // Fallback to Excel file only if Supabase is not configured
       const possibleFilenames = [
         'Mr Tunde Martins AKande @60 Guest List.xlsx',
-        'guest-list.xlsx'
+        'guest-list.xlsx',
       ];
-      
+
       let guests = [];
       for (const filename of possibleFilenames) {
         const excelUrl = `${process.env.PUBLIC_URL || ''}/data/${encodeURIComponent(filename)}`;
         guests = await loadGuestListFromFile(excelUrl);
         if (guests.length > 0) {
-          break; // Found a valid file
+          break;
         }
       }
-      
+
       if (guests.length > 0) {
         setGuestList(guests);
-        // Also save to localStorage as backup
         try {
           window.localStorage.setItem(GUEST_LIST_STORAGE_KEY, JSON.stringify(guests));
         } catch (storageError) {
           console.error('Failed to save guest list to storage', storageError);
         }
       } else {
-        // Fallback to localStorage if Excel file not found
         try {
           const storedValue = window.localStorage.getItem(GUEST_LIST_STORAGE_KEY);
           if (storedValue) {
@@ -73,29 +53,11 @@ const UploadInvitationsPage = ({ onBack }) => {
   useEffect(() => {
     const loadInvitations = async () => {
       if (guestList.length === 0) return;
-
-      // Try Supabase first
-      const supabaseInvitations = await loadInvitationsFromSupabase();
-      
-      if (supabaseInvitations !== null) {
-        // Use Supabase invitations
-        setInvitations(supabaseInvitations);
-        return;
-      }
-
-      // Fallback to public folder if Supabase not configured
-      const tableNames = [...new Set(guestList.map(guest => guest.table).filter(Boolean))];
-      const loadedInvitations = {};
-      
-      // Check each table for an invitation file
-      for (const tableName of tableNames) {
-        const invitation = await getInvitationForTable(tableName);
-        if (invitation) {
-          loadedInvitations[tableName] = invitation;
-        }
-      }
-      
+      setLoadingInvites(true);
+      const tableNames = [...new Set(guestList.map((guest) => guest.table).filter(Boolean))];
+      const loadedInvitations = await loadAllInvitations(tableNames);
       setInvitations(loadedInvitations);
+      setLoadingInvites(false);
     };
 
     loadInvitations();
@@ -113,100 +75,16 @@ const UploadInvitationsPage = ({ onBack }) => {
     });
 
     return Array.from(tableMap.entries())
-      .map(([name, guests]) => ({
-        name,
-        count: guests.length,
-        hasInvitation: !!invitations[name],
-      }))
+      .map(([name, guests]) => {
+        const invitation = findInvitationInMap(name, invitations);
+        return {
+          name,
+          count: guests.length,
+          invitation,
+        };
+      })
       .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
   }, [guestList, invitations]);
-
-  const handleSelectFile = (tableName) => {
-    if (fileInputsRef.current[tableName]) {
-      fileInputsRef.current[tableName].click();
-    }
-  };
-
-  const handleFileChange = async (tableName, event) => {
-    const file = event.target.files?.[0];
-    if (!file) {
-      return;
-    }
-
-    setUploading(prev => ({ ...prev, [tableName]: true }));
-
-    const reader = new FileReader();
-
-    reader.onload = async (e) => {
-      const dataUrl = e.target?.result;
-      if (!dataUrl || typeof dataUrl !== 'string') {
-        setUploading(prev => ({ ...prev, [tableName]: false }));
-        return;
-      }
-
-      // Save to Supabase
-      const saved = await saveInvitationToSupabase(
-        tableName,
-        null, // file_url (not using external URLs)
-        file.type,
-        file.name,
-        dataUrl // Store as base64 data URL
-      );
-
-      if (saved) {
-        // Reload invitations to show the new one
-        const updatedInvitations = await loadInvitationsFromSupabase();
-        if (updatedInvitations !== null) {
-          setInvitations(updatedInvitations);
-        } else {
-          // Fallback: update local state
-          setInvitations(prev => ({
-            ...prev,
-            [tableName]: {
-              url: dataUrl,
-              type: file.type,
-              name: file.name,
-              dataUrl: dataUrl,
-            },
-          }));
-        }
-      }
-
-      setUploading(prev => ({ ...prev, [tableName]: false }));
-      // Reset file input
-      if (fileInputsRef.current[tableName]) {
-        fileInputsRef.current[tableName].value = '';
-      }
-    };
-
-    reader.onerror = () => {
-      setUploading(prev => ({ ...prev, [tableName]: false }));
-    };
-
-    reader.readAsDataURL(file);
-  };
-
-  const handleClearInvitation = async (tableName) => {
-    if (!window.confirm(`Are you sure you want to remove the invitation for ${tableName}?`)) {
-      return;
-    }
-
-    const deleted = await deleteInvitationFromSupabase(tableName);
-    if (deleted) {
-      // Reload invitations
-      const updatedInvitations = await loadInvitationsFromSupabase();
-      if (updatedInvitations !== null) {
-        setInvitations(updatedInvitations);
-      } else {
-        // Fallback: update local state
-        setInvitations(prev => {
-          const next = { ...prev };
-          delete next[tableName];
-          return next;
-        });
-      }
-    }
-  };
 
   return (
     <main className="UploadInvitationsPage">
@@ -223,8 +101,9 @@ const UploadInvitationsPage = ({ onBack }) => {
 
       <section className="UploadInvitationsPage__info">
         <p className="UploadInvitationsPage__infoText">
-          <strong>Upload invitations:</strong> Click "Upload Invitation" for each table to add invitation files. 
-          Supported formats: PDF, PNG, JPG, JPEG. Invitations are saved to Supabase and available on all devices.
+          Invitations are now served directly from <code>public/data/invitations/</code>. Place files like
+          <strong> 45.THE PENT CLUB.pdf</strong> in that folder and redeploy so they are available on every device.
+          Supported formats: PDF, PNG, JPG, JPEG.
         </p>
       </section>
 
@@ -236,68 +115,46 @@ const UploadInvitationsPage = ({ onBack }) => {
         </section>
       ) : (
         <section className="UploadInvitationsPage__grid">
-          {tables.map((table) => (
-            <article key={table.name} className="UploadInvitationsPage__card">
-              <h2 className="UploadInvitationsPage__cardTitle">{table.name}</h2>
-              <p className="UploadInvitationsPage__cardMeta">
-                {table.count} guest{table.count === 1 ? '' : 's'}
-              </p>
-              <div className="UploadInvitationsPage__status">
-                {table.hasInvitation ? (
-                  <div className="UploadInvitationsPage__statusBadge UploadInvitationsPage__statusBadge--success">
-                    ✓ Invitation Available
+          {loadingInvites ? (
+            <p className="UploadInvitationsPage__status">Scanning public folder for invitations...</p>
+          ) : (
+            tables.map((table) => (
+              <article key={table.name} className="UploadInvitationsPage__card">
+                <h2 className="UploadInvitationsPage__cardTitle">{table.name}</h2>
+                <p className="UploadInvitationsPage__cardMeta">
+                  {table.count} guest{table.count === 1 ? '' : 's'}
+                </p>
+                <div className="UploadInvitationsPage__status">
+                  {table.invitation ? (
+                    <div className="UploadInvitationsPage__statusBadge UploadInvitationsPage__statusBadge--success">
+                      ✓ Invitation Found
+                    </div>
+                  ) : (
+                    <div className="UploadInvitationsPage__statusBadge UploadInvitationsPage__statusBadge--missing">
+                      Missing Invitation
+                    </div>
+                  )}
+                </div>
+                {table.invitation ? (
+                  <div className="UploadInvitationsPage__fileInfo">
+                    <p className="UploadInvitationsPage__fileName">{table.invitation.name}</p>
+                    <a
+                      href={table.invitation.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="UploadInvitationsPage__view"
+                    >
+                      View
+                    </a>
                   </div>
                 ) : (
-                  <div className="UploadInvitationsPage__statusBadge UploadInvitationsPage__statusBadge--missing">
-                    No Invitation
-                  </div>
-                )}
-              </div>
-              <div className="UploadInvitationsPage__actions">
-                <button
-                  type="button"
-                  className="UploadInvitationsPage__upload"
-                  onClick={() => handleSelectFile(table.name)}
-                  disabled={uploading[table.name]}
-                >
-                  {uploading[table.name] ? 'Uploading...' : (table.hasInvitation ? 'Replace Invitation' : 'Upload Invitation')}
-                </button>
-                {table.hasInvitation && (
-                  <button
-                    type="button"
-                    className="UploadInvitationsPage__clear"
-                    onClick={() => handleClearInvitation(table.name)}
-                  >
-                    Remove
-                  </button>
-                )}
-              </div>
-              {table.hasInvitation && invitations[table.name] && (
-                <div className="UploadInvitationsPage__fileInfo">
-                  <p className="UploadInvitationsPage__fileName">
-                    {invitations[table.name].name}
+                  <p className="UploadInvitationsPage__missingNote">
+                    Place <strong>{table.name}.pdf</strong> (or .png/.jpg) in <code>public/data/invitations/</code>.
                   </p>
-                  <a
-                    href={invitations[table.name].url || invitations[table.name].dataUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="UploadInvitationsPage__view"
-                  >
-                    View
-                  </a>
-                </div>
-              )}
-              <input
-                ref={(node) => {
-                  fileInputsRef.current[table.name] = node;
-                }}
-                type="file"
-                accept=".pdf,.png,.jpg,.jpeg,image/png,image/jpeg,application/pdf"
-                className="UploadInvitationsPage__fileInput"
-                onChange={(event) => handleFileChange(table.name, event)}
-              />
-            </article>
-          ))}
+                )}
+              </article>
+            ))
+          )}
         </section>
       )}
     </main>
