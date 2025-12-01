@@ -1,4 +1,34 @@
+import { createClient } from '@supabase/supabase-js';
 import { supabase, TABLES, isSupabaseConfigured } from '../config/supabase';
+
+// Helper to check if Supabase is available for download tracking
+// This allows Supabase to be used for download tracking even if REACT_APP_USE_SUPABASE is not set
+const isSupabaseAvailableForDownloads = () => {
+  const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || '';
+  const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY || '';
+  return !!(supabaseUrl && supabaseAnonKey && supabaseUrl !== '' && supabaseAnonKey !== '');
+};
+
+// Cache for download tracking Supabase client
+let downloadSupabaseClient = null;
+
+// Get Supabase client for download tracking (creates one if credentials are available)
+const getSupabaseForDownloads = () => {
+  if (!isSupabaseAvailableForDownloads()) {
+    return null;
+  }
+  // If supabase is already created from config, use it
+  if (supabase) {
+    return supabase;
+  }
+  // Otherwise create a new client for download tracking (cache it)
+  if (!downloadSupabaseClient) {
+    const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
+    const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
+    downloadSupabaseClient = createClient(supabaseUrl, supabaseAnonKey);
+  }
+  return downloadSupabaseClient;
+};
 
 /**
  * Loads all guests from Supabase
@@ -297,14 +327,15 @@ export const markGuestAsDownloaded = async (guestName, tableName = null) => {
   }
 
   // Use Supabase ONLY for download tracking
-  if (!isSupabaseConfigured() || !supabase) {
-    console.error('Supabase is not configured. Cannot track downloads.');
+  const downloadSupabase = getSupabaseForDownloads();
+  if (!downloadSupabase) {
+    console.error('Supabase credentials not found. Cannot track downloads. Please set REACT_APP_SUPABASE_URL and REACT_APP_SUPABASE_ANON_KEY.');
     return false;
   }
 
   try {
     // First, check if guest exists
-    const { data: existing } = await supabase
+    const { data: existing } = await downloadSupabase
       .from(TABLES.GUESTS)
       .select('id, name, table_name')
       .eq('name', guestName)
@@ -312,7 +343,7 @@ export const markGuestAsDownloaded = async (guestName, tableName = null) => {
 
     if (existing) {
       // Update existing record
-      const { error } = await supabase
+      const { error } = await downloadSupabase
         .from(TABLES.GUESTS)
         .update({ downloaded: true })
         .eq('name', guestName);
@@ -325,7 +356,7 @@ export const markGuestAsDownloaded = async (guestName, tableName = null) => {
     } else {
       // Insert new record (we only need name and downloaded status)
       // If tableName is provided, include it; otherwise use a placeholder
-      const { error } = await supabase
+      const { error } = await downloadSupabase
         .from(TABLES.GUESTS)
         .insert({
           name: guestName,
@@ -357,12 +388,13 @@ export const isGuestDownloaded = async (guestName) => {
   }
 
   // Use Supabase ONLY for download tracking
-  if (!isSupabaseConfigured() || !supabase) {
+  const downloadSupabase = getSupabaseForDownloads();
+  if (!downloadSupabase) {
     return false;
   }
 
   try {
-    const { data, error } = await supabase
+    const { data, error } = await downloadSupabase
       .from(TABLES.GUESTS)
       .select('downloaded')
       .eq('name', guestName)
@@ -387,12 +419,13 @@ export const isGuestDownloaded = async (guestName) => {
  */
 export const getDownloadedGuests = async () => {
   // Use Supabase ONLY for download tracking
-  if (!isSupabaseConfigured() || !supabase) {
+  const downloadSupabase = getSupabaseForDownloads();
+  if (!downloadSupabase) {
     return [];
   }
 
   try {
-    const { data, error } = await supabase
+    const { data, error } = await downloadSupabase
       .from(TABLES.GUESTS)
       .select('name')
       .eq('downloaded', true);
@@ -416,13 +449,14 @@ export const getDownloadedGuests = async () => {
  */
 export const uncheckAllGuests = async () => {
   // Use Supabase ONLY for download tracking
-  if (!isSupabaseConfigured() || !supabase) {
-    console.error('Supabase is not configured. Cannot reset download statuses.');
+  const downloadSupabase = getSupabaseForDownloads();
+  if (!downloadSupabase) {
+    console.error('Supabase credentials not found. Cannot reset download statuses. Please set REACT_APP_SUPABASE_URL and REACT_APP_SUPABASE_ANON_KEY.');
     return false;
   }
 
   try {
-    const { error } = await supabase
+    const { error } = await downloadSupabase
       .from(TABLES.GUESTS)
       .update({ downloaded: false })
       .neq('id', 0); // Update all rows
