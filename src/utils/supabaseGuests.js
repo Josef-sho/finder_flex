@@ -286,18 +286,32 @@ export const clearAllInvitationsFromSupabase = async () => {
 
 /**
  * Marks a guest as having downloaded their invitation
- * Uses localStorage when Supabase is disabled, Supabase when enabled
+ * Uses Supabase ONLY for download tracking
  * @param {string} guestName - The guest's name
+ * @param {string} tableName - The guest's table (optional, for upsert)
  * @returns {Promise<boolean>}
  */
-export const markGuestAsDownloaded = async (guestName) => {
+export const markGuestAsDownloaded = async (guestName, tableName = null) => {
   if (!guestName) {
     return false;
   }
 
-  // Try Supabase first if configured
-  if (isSupabaseConfigured() && supabase) {
-    try {
+  // Use Supabase ONLY for download tracking
+  if (!isSupabaseConfigured() || !supabase) {
+    console.error('Supabase is not configured. Cannot track downloads.');
+    return false;
+  }
+
+  try {
+    // First, check if guest exists
+    const { data: existing } = await supabase
+      .from(TABLES.GUESTS)
+      .select('id, name, table_name')
+      .eq('name', guestName)
+      .maybeSingle();
+
+    if (existing) {
+      // Update existing record
       const { error } = await supabase
         .from(TABLES.GUESTS)
         .update({ downloaded: true })
@@ -305,41 +319,35 @@ export const markGuestAsDownloaded = async (guestName) => {
 
       if (error) {
         console.error('Error marking guest as downloaded in Supabase:', error);
-        // Fall through to localStorage fallback
-      } else {
-        return true;
+        return false;
       }
-    } catch (err) {
-      console.error('Error marking guest as downloaded in Supabase:', err);
-      // Fall through to localStorage fallback
-    }
-  }
+      return true;
+    } else {
+      // Insert new record (we only need name and downloaded status)
+      // If tableName is provided, include it; otherwise use a placeholder
+      const { error } = await supabase
+        .from(TABLES.GUESTS)
+        .insert({
+          name: guestName,
+          table_name: tableName || 'Unknown',
+          downloaded: true,
+        });
 
-  // Fallback to localStorage (works even when Supabase is disabled)
-  try {
-    const DOWNLOADED_STORAGE_KEY = 'finder-flex:downloaded-guests';
-    const downloadedNames = JSON.parse(
-      window.localStorage.getItem(DOWNLOADED_STORAGE_KEY) || '[]'
-    );
-    
-    if (!downloadedNames.includes(guestName)) {
-      downloadedNames.push(guestName);
-      window.localStorage.setItem(
-        DOWNLOADED_STORAGE_KEY,
-        JSON.stringify(downloadedNames)
-      );
+      if (error) {
+        console.error('Error inserting guest download status in Supabase:', error);
+        return false;
+      }
+      return true;
     }
-    
-    return true;
   } catch (err) {
-    console.error('Error marking guest as downloaded in localStorage:', err);
+    console.error('Error marking guest as downloaded in Supabase:', err);
     return false;
   }
 };
 
 /**
  * Gets the downloaded status for a guest name
- * Uses localStorage when Supabase is disabled, Supabase when enabled
+ * Uses Supabase ONLY for download tracking
  * @param {string} guestName - The guest's name
  * @returns {Promise<boolean>}
  */
@@ -348,89 +356,85 @@ export const isGuestDownloaded = async (guestName) => {
     return false;
   }
 
-  // Try Supabase first if configured
-  if (isSupabaseConfigured() && supabase) {
-    try {
-      const { data, error } = await supabase
-        .from(TABLES.GUESTS)
-        .select('downloaded')
-        .eq('name', guestName)
-        .single();
-
-      if (!error && data) {
-        return data.downloaded === true;
-      }
-    } catch (err) {
-      // Fall through to localStorage fallback
-    }
+  // Use Supabase ONLY for download tracking
+  if (!isSupabaseConfigured() || !supabase) {
+    return false;
   }
 
-  // Fallback to localStorage
   try {
-    const DOWNLOADED_STORAGE_KEY = 'finder-flex:downloaded-guests';
-    const downloadedNames = JSON.parse(
-      window.localStorage.getItem(DOWNLOADED_STORAGE_KEY) || '[]'
-    );
-    return downloadedNames.includes(guestName);
+    const { data, error } = await supabase
+      .from(TABLES.GUESTS)
+      .select('downloaded')
+      .eq('name', guestName)
+      .maybeSingle();
+
+    if (error && error.code !== 'PGRST116') { // PGRST116 is "not found" which is fine
+      console.error('Error checking guest download status in Supabase:', error);
+      return false;
+    }
+
+    return data?.downloaded === true;
   } catch (err) {
+    console.error('Error checking guest download status:', err);
     return false;
   }
 };
 
 /**
- * Gets all downloaded guest names from localStorage
- * @returns {string[]}
+ * Gets all downloaded guest names from Supabase
+ * Uses Supabase ONLY for download tracking
+ * @returns {Promise<string[]>}
  */
-export const getDownloadedGuests = () => {
+export const getDownloadedGuests = async () => {
+  // Use Supabase ONLY for download tracking
+  if (!isSupabaseConfigured() || !supabase) {
+    return [];
+  }
+
   try {
-    const DOWNLOADED_STORAGE_KEY = 'finder-flex:downloaded-guests';
-    return JSON.parse(
-      window.localStorage.getItem(DOWNLOADED_STORAGE_KEY) || '[]'
-    );
+    const { data, error } = await supabase
+      .from(TABLES.GUESTS)
+      .select('name')
+      .eq('downloaded', true);
+
+    if (error) {
+      console.error('Error getting downloaded guests from Supabase:', error);
+      return [];
+    }
+
+    return (data || []).map(guest => guest.name);
   } catch (err) {
+    console.error('Error getting downloaded guests:', err);
     return [];
   }
 };
 
 /**
  * Unchecks all guests (sets downloaded to false for all)
+ * Uses Supabase ONLY for download tracking
  * @returns {Promise<boolean>}
  */
 export const uncheckAllGuests = async () => {
-  // Try Supabase first if configured
-  if (isSupabaseConfigured() && supabase) {
-    try {
-      const { error } = await supabase
-        .from(TABLES.GUESTS)
-        .update({ downloaded: false })
-        .neq('id', 0); // Update all rows
-
-      if (error) {
-        console.error('Error unchecking all guests in Supabase:', error);
-        // Fall through to localStorage fallback
-      } else {
-        // Also clear localStorage to keep them in sync
-        try {
-          const DOWNLOADED_STORAGE_KEY = 'finder-flex:downloaded-guests';
-          window.localStorage.setItem(DOWNLOADED_STORAGE_KEY, JSON.stringify([]));
-        } catch (err) {
-          // Ignore localStorage errors
-        }
-        return true;
-      }
-    } catch (err) {
-      console.error('Error unchecking all guests in Supabase:', err);
-      // Fall through to localStorage fallback
-    }
+  // Use Supabase ONLY for download tracking
+  if (!isSupabaseConfigured() || !supabase) {
+    console.error('Supabase is not configured. Cannot reset download statuses.');
+    return false;
   }
 
-  // Fallback to localStorage (works even when Supabase is disabled)
   try {
-    const DOWNLOADED_STORAGE_KEY = 'finder-flex:downloaded-guests';
-    window.localStorage.setItem(DOWNLOADED_STORAGE_KEY, JSON.stringify([]));
+    const { error } = await supabase
+      .from(TABLES.GUESTS)
+      .update({ downloaded: false })
+      .neq('id', 0); // Update all rows
+
+    if (error) {
+      console.error('Error unchecking all guests in Supabase:', error);
+      return false;
+    }
+
     return true;
   } catch (err) {
-    console.error('Error unchecking all guests in localStorage:', err);
+    console.error('Error unchecking all guests in Supabase:', err);
     return false;
   }
 };

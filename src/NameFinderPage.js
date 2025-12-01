@@ -4,7 +4,7 @@ import { GUEST_LIST_STORAGE_KEY } from './ManageListPage';
 import { loadGuestListFromFile } from './utils/excelParser';
 import { loadAllInvitations, findInvitationInMap } from './utils/invitationLoader';
 import { downloadFile } from './utils/downloadHelper';
-import { loadGuestsFromSupabase, loadInvitationsFromSupabase, markGuestAsDownloaded, getDownloadedGuests } from './utils/supabaseGuests';
+import { loadGuestsFromSupabase, loadInvitationsFromSupabase, markGuestAsDownloaded, getDownloadedGuests, isGuestDownloaded } from './utils/supabaseGuests';
 
 const HERO_IMAGE_FILENAME = 'CELEBRANT IMAGE.png';
 const HERO_IMAGE_URL = `${process.env.PUBLIC_URL || ''}/images/${encodeURIComponent(
@@ -106,8 +106,8 @@ const NameFinderPage = () => {
       
       // If Supabase is configured (even if empty), use it and don't fall back
       if (supabaseGuests !== null) {
-        // Load download status from localStorage (works even with Supabase)
-        const downloadedNames = getDownloadedGuests();
+        // Load download status from Supabase (Supabase is used ONLY for download tracking)
+        const downloadedNames = await getDownloadedGuests();
         const guestsWithStatus = supabaseGuests.map(guest => ({
           ...guest,
           downloaded: guest.downloaded === true || downloadedNames.includes(guest.name)
@@ -139,8 +139,8 @@ const NameFinderPage = () => {
       }
       
       if (guests.length > 0) {
-        // Load download status from localStorage
-        const downloadedNames = getDownloadedGuests();
+        // Load download status from Supabase (Supabase is used ONLY for download tracking)
+        const downloadedNames = await getDownloadedGuests();
         const guestsWithStatus = guests.map(guest => ({
           ...guest,
           downloaded: downloadedNames.includes(guest.name)
@@ -160,8 +160,8 @@ const NameFinderPage = () => {
           if (storedValue) {
             const parsed = JSON.parse(storedValue);
             if (Array.isArray(parsed)) {
-              // Ensure download status is loaded
-              const downloadedNames = getDownloadedGuests();
+              // Ensure download status is loaded from Supabase
+              const downloadedNames = await getDownloadedGuests();
               const guestsWithStatus = parsed.map(guest => ({
                 ...guest,
                 downloaded: downloadedNames.includes(guest.name)
@@ -221,11 +221,10 @@ const NameFinderPage = () => {
     setSelectedGuest(null); // Clear selection when typing
   };
 
-  const handleSuggestionClick = (guest) => {
+  const handleSuggestionClick = async (guest) => {
     setQuery(guest.name);
-    // Check download status from localStorage (works even when Supabase is disabled)
-    const downloadedNames = getDownloadedGuests();
-    const downloaded = downloadedNames.includes(guest.name);
+    // Check download status from Supabase (Supabase is used ONLY for download tracking)
+    const downloaded = await isGuestDownloaded(guest.name);
     setSelectedGuest({ ...guest, downloaded });
   };
 
@@ -234,45 +233,15 @@ const NameFinderPage = () => {
     // If there's exactly one result, select it
     if (results.length === 1 && !selectedGuest) {
       const guest = results[0];
-      // Check download status from localStorage (works even when Supabase is disabled)
-      const downloadedNames = getDownloadedGuests();
-      const downloaded = downloadedNames.includes(guest.name);
-      
-      // Also try Supabase if configured
-      const supabaseGuests = await loadGuestsFromSupabase();
-      if (supabaseGuests !== null) {
-        const supabaseGuest = supabaseGuests.find(g => g.name === guest.name);
-        const finalDownloaded = supabaseGuest?.downloaded === true || downloaded;
-        setSelectedGuest({ ...guest, downloaded: finalDownloaded });
-        // Update guest list with latest status
-        setGuestList(supabaseGuests.map(g => ({
-          ...g,
-          downloaded: g.downloaded === true || downloadedNames.includes(g.name)
-        })));
-      } else {
-        setSelectedGuest({ ...guest, downloaded });
-      }
+      // Check download status from Supabase (Supabase is used ONLY for download tracking)
+      const downloaded = await isGuestDownloaded(guest.name);
+      setSelectedGuest({ ...guest, downloaded });
     } else if (results.length > 0 && query.trim()) {
       // If multiple results, select the first one
       const guest = results[0];
-      // Check download status from localStorage (works even when Supabase is disabled)
-      const downloadedNames = getDownloadedGuests();
-      const downloaded = downloadedNames.includes(guest.name);
-      
-      // Also try Supabase if configured
-      const supabaseGuests = await loadGuestsFromSupabase();
-      if (supabaseGuests !== null) {
-        const supabaseGuest = supabaseGuests.find(g => g.name === guest.name);
-        const finalDownloaded = supabaseGuest?.downloaded === true || downloaded;
-        setSelectedGuest({ ...guest, downloaded: finalDownloaded });
-        // Update guest list with latest status
-        setGuestList(supabaseGuests.map(g => ({
-          ...g,
-          downloaded: g.downloaded === true || downloadedNames.includes(g.name)
-        })));
-      } else {
-        setSelectedGuest({ ...guest, downloaded });
-      }
+      // Check download status from Supabase (Supabase is used ONLY for download tracking)
+      const downloaded = await isGuestDownloaded(guest.name);
+      setSelectedGuest({ ...guest, downloaded });
     }
   };
 
@@ -422,8 +391,8 @@ const NameFinderPage = () => {
                           
                           try {
                             await downloadFile(fileUrl, fileName);
-                            // Mark as downloaded only after successful download
-                            const marked = await markGuestAsDownloaded(selectedGuest.name);
+                            // Mark as downloaded only after successful download (Supabase is used ONLY for download tracking)
+                            const marked = await markGuestAsDownloaded(selectedGuest.name, selectedGuest.table);
                             if (marked) {
                               // Update local state
                               setGuestList(prev => prev.map(g => 
@@ -506,8 +475,8 @@ const NameFinderPage = () => {
                           
                           try {
                             await downloadFile(fileUrl, fileName);
-                            // Mark as downloaded only after successful download
-                            const marked = await markGuestAsDownloaded(selectedGuest.name);
+                            // Mark as downloaded only after successful download (Supabase is used ONLY for download tracking)
+                            const marked = await markGuestAsDownloaded(selectedGuest.name, selectedGuest.table);
                             if (marked) {
                               // Update local state
                               setGuestList(prev => prev.map(g => 

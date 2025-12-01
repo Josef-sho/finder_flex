@@ -23,10 +23,16 @@ const ManageListPage = ({ onBack }) => {
       
       // If Supabase is configured (even if empty), use it and don't fall back
       if (supabaseGuests !== null) {
-        setGuestList(supabaseGuests);
+        // Load download status from Supabase (Supabase is used ONLY for download tracking)
+        const downloadedNames = await getDownloadedGuests();
+        const guestsWithStatus = supabaseGuests.map(guest => ({
+          ...guest,
+          downloaded: guest.downloaded === true || downloadedNames.includes(guest.name)
+        }));
+        setGuestList(guestsWithStatus);
         // Also save to localStorage as backup
         try {
-          window.localStorage.setItem(GUEST_LIST_STORAGE_KEY, JSON.stringify(supabaseGuests));
+          window.localStorage.setItem(GUEST_LIST_STORAGE_KEY, JSON.stringify(guestsWithStatus));
         } catch (storageError) {
           console.error('Failed to save guest list to storage', storageError);
         }
@@ -49,8 +55,8 @@ const ManageListPage = ({ onBack }) => {
       }
       
       if (guests.length > 0) {
-        // Load download status from localStorage
-        const downloadedNames = getDownloadedGuests();
+        // Load download status from Supabase (Supabase is used ONLY for download tracking)
+        const downloadedNames = await getDownloadedGuests();
         const guestsWithStatus = guests.map(guest => ({
           ...guest,
           downloaded: downloadedNames.includes(guest.name)
@@ -70,8 +76,8 @@ const ManageListPage = ({ onBack }) => {
           if (storedValue) {
             const parsed = JSON.parse(storedValue);
             if (Array.isArray(parsed)) {
-              // Ensure download status is loaded
-              const downloadedNames = getDownloadedGuests();
+              // Ensure download status is loaded from Supabase
+              const downloadedNames = await getDownloadedGuests();
               const guestsWithStatus = parsed.map(guest => ({
                 ...guest,
                 downloaded: downloadedNames.includes(guest.name)
