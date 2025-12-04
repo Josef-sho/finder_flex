@@ -11,10 +11,18 @@ import { loadGuestsFromSupabase, saveGuestsToSupabase, clearAllGuestsFromSupabas
 
 export const GUEST_LIST_STORAGE_KEY = 'finder-flex:guest-list';
 
+const normalizeValue = (value) =>
+  value
+    .toLowerCase()
+    .replace(/[^\w\s-]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
 const ManageListPage = ({ onBack }) => {
   const fileInputRef = useRef(null);
   const [guestList, setGuestList] = useState([]);
   const [error, setError] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     const loadGuestList = async () => {
@@ -175,6 +183,25 @@ const ManageListPage = ({ onBack }) => {
     []
   );
 
+  // Filter guests based on search query
+  const filteredGuestList = useMemo(() => {
+    if (!searchQuery.trim()) {
+      return guestList;
+    }
+
+    const normalizedQuery = normalizeValue(searchQuery);
+    return guestList.filter((guest) => {
+      const normalizedName = normalizeValue(guest.name || '');
+      const normalizedTable = normalizeValue(guest.table || '');
+      
+      // Check if query matches name or table
+      return (
+        normalizedName.includes(normalizedQuery) ||
+        normalizedTable.includes(normalizedQuery)
+      );
+    });
+  }, [guestList, searchQuery]);
+
   const handleUncheckAll = useCallback(async () => {
     if (!window.confirm('Are you sure you want to reset all download statuses? This will allow all guests to download their invitations again.')) {
       return;
@@ -246,6 +273,32 @@ const ManageListPage = ({ onBack }) => {
                 Guest list loaded. You can upload a new file to replace it or clear the list.
               </p>
             </div>
+            <div className="ManageListPage__searchWrapper">
+              <input
+                type="text"
+                className="ManageListPage__searchInput"
+                placeholder="Search by name or table..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  className="ManageListPage__searchClear"
+                  onClick={() => setSearchQuery('')}
+                  aria-label="Clear search"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+            {searchQuery && (
+              <div className="ManageListPage__searchResults">
+                <p className="ManageListPage__searchResultsText">
+                  Showing {filteredGuestList.length} of {guestList.length} guests
+                </p>
+              </div>
+            )}
             <div className="ManageListPage__actions">
               <button
                 type="button"
@@ -274,28 +327,36 @@ const ManageListPage = ({ onBack }) => {
                   </tr>
                 </thead>
                 <tbody>
-                  {guestList.map((guest, index) => (
-                    <tr key={`${guest.name}-${index}`}>
-                      {displayColumns.map((column) => {
-                        if (column.key === 'downloaded') {
+                  {filteredGuestList.length > 0 ? (
+                    filteredGuestList.map((guest, index) => (
+                      <tr key={`${guest.name}-${index}`}>
+                        {displayColumns.map((column) => {
+                          if (column.key === 'downloaded') {
+                            return (
+                              <td key={column.key} className="ManageListPage__checkCell">
+                                {guest.downloaded ? (
+                                  <span className="ManageListPage__checkmark" aria-label="Downloaded">✓</span>
+                                ) : (
+                                  <span className="ManageListPage__noCheck" aria-label="Not downloaded">—</span>
+                                )}
+                              </td>
+                            );
+                          }
                           return (
-                            <td key={column.key} className="ManageListPage__checkCell">
-                              {guest.downloaded ? (
-                                <span className="ManageListPage__checkmark" aria-label="Downloaded">✓</span>
-                              ) : (
-                                <span className="ManageListPage__noCheck" aria-label="Not downloaded">—</span>
-                              )}
+                            <td key={column.key}>
+                              {guest[column.key] || '—'}
                             </td>
                           );
-                        }
-                        return (
-                          <td key={column.key}>
-                            {guest[column.key] || '—'}
-                          </td>
-                        );
-                      })}
+                        })}
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={displayColumns.length} className="ManageListPage__noResults">
+                        No guests found matching "{searchQuery}"
+                      </td>
                     </tr>
-                  ))}
+                  )}
                 </tbody>
               </table>
             </div>
