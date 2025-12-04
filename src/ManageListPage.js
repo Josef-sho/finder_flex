@@ -23,6 +23,7 @@ const ManageListPage = ({ onBack }) => {
   const [guestList, setGuestList] = useState([]);
   const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [filterDownloaded, setFilterDownloaded] = useState(false);
 
   useEffect(() => {
     const loadGuestList = async () => {
@@ -183,24 +184,32 @@ const ManageListPage = ({ onBack }) => {
     []
   );
 
-  // Filter guests based on search query
+  // Filter guests based on search query and download status
   const filteredGuestList = useMemo(() => {
-    if (!searchQuery.trim()) {
-      return guestList;
+    let filtered = guestList;
+
+    // Filter by download status first
+    if (filterDownloaded) {
+      filtered = filtered.filter((guest) => guest.downloaded === true);
     }
 
-    const normalizedQuery = normalizeValue(searchQuery);
-    return guestList.filter((guest) => {
-      const normalizedName = normalizeValue(guest.name || '');
-      const normalizedTable = normalizeValue(guest.table || '');
-      
-      // Check if query matches name or table
-      return (
-        normalizedName.includes(normalizedQuery) ||
-        normalizedTable.includes(normalizedQuery)
-      );
-    });
-  }, [guestList, searchQuery]);
+    // Then filter by search query
+    if (searchQuery.trim()) {
+      const normalizedQuery = normalizeValue(searchQuery);
+      filtered = filtered.filter((guest) => {
+        const normalizedName = normalizeValue(guest.name || '');
+        const normalizedTable = normalizeValue(guest.table || '');
+        
+        // Check if query matches name or table
+        return (
+          normalizedName.includes(normalizedQuery) ||
+          normalizedTable.includes(normalizedQuery)
+        );
+      });
+    }
+
+    return filtered;
+  }, [guestList, searchQuery, filterDownloaded]);
 
   const handleUncheckAll = useCallback(async () => {
     if (!window.confirm('Are you sure you want to reset all download statuses? This will allow all guests to download their invitations again.')) {
@@ -268,6 +277,24 @@ const ManageListPage = ({ onBack }) => {
           </div>
         ) : guestList.length ? (
           <>
+            <div className="ManageListPage__stats">
+              <div className="ManageListPage__statItem">
+                <span className="ManageListPage__statLabel">Total Guests</span>
+                <span className="ManageListPage__statValue">{guestList.length}</span>
+              </div>
+              <div className="ManageListPage__statItem">
+                <span className="ManageListPage__statLabel">Downloaded</span>
+                <span className="ManageListPage__statValue ManageListPage__statValue--downloaded">
+                  {guestList.filter(g => g.downloaded).length}
+                </span>
+              </div>
+              <div className="ManageListPage__statItem">
+                <span className="ManageListPage__statLabel">Not Downloaded</span>
+                <span className="ManageListPage__statValue ManageListPage__statValue--notDownloaded">
+                  {guestList.filter(g => !g.downloaded).length}
+                </span>
+              </div>
+            </div>
             <div className="ManageListPage__info">
               <p className="ManageListPage__infoText">
                 Guest list loaded. You can upload a new file to replace it or clear the list.
@@ -292,10 +319,30 @@ const ManageListPage = ({ onBack }) => {
                 </button>
               )}
             </div>
-            {searchQuery && (
+            <div className="ManageListPage__filters">
+              <button
+                type="button"
+                className={`ManageListPage__filterButton ${filterDownloaded ? 'ManageListPage__filterButton--active' : ''}`}
+                onClick={() => setFilterDownloaded(!filterDownloaded)}
+              >
+                {filterDownloaded ? (
+                  <>
+                    <span className="ManageListPage__filterIcon">✓</span>
+                    Show Only Downloaded
+                  </>
+                ) : (
+                  <>
+                    <span className="ManageListPage__filterIcon">○</span>
+                    Show Only Downloaded
+                  </>
+                )}
+              </button>
+            </div>
+            {(searchQuery || filterDownloaded) && (
               <div className="ManageListPage__searchResults">
                 <p className="ManageListPage__searchResultsText">
                   Showing {filteredGuestList.length} of {guestList.length} guests
+                  {filterDownloaded && ` (${guestList.filter(g => g.downloaded).length} downloaded)`}
                 </p>
               </div>
             )}

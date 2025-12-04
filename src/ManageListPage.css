@@ -315,3 +315,116 @@
   font-style: italic;
 }
 
+.ManageListPage__filters {
+  margin-bottom: 1rem;
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.ManageListPage__filterButton {
+  padding: 0.625rem 1rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  border: 2px solid #d8deed;
+  border-radius: 0.5rem;
+  background-color: #ffffff;
+  color: #41506c;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ManageListPage__filterButton:hover {
+  border-color: #2d6cdf;
+  background-color: #f4f6fb;
+  color: #2d6cdf;
+}
+
+.ManageListPage__filterButton--active {
+  border-color: #2d6cdf;
+  background-color: #2d6cdf;
+  color: #ffffff;
+}
+
+.ManageListPage__filterButton--active:hover {
+  background-color: #2563eb;
+  border-color: #2563eb;
+}
+
+.ManageListPage__filterIcon {
+  font-size: 1rem;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.ManageListPage__stats {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  padding: 1.25rem;
+  background: linear-gradient(135deg, #f4f6fb 0%, #e8f4fd 100%);
+  border-radius: 0.75rem;
+  border: 1px solid #d8deed;
+  box-shadow: 0 4px 12px rgba(31, 42, 68, 0.05);
+}
+
+.ManageListPage__statItem {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  background-color: #ffffff;
+  border-radius: 0.5rem;
+  border: 1px solid #e4eaf7;
+  text-align: center;
+}
+
+.ManageListPage__statLabel {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.ManageListPage__statValue {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #1f2a44;
+  line-height: 1;
+}
+
+.ManageListPage__statValue--downloaded {
+  color: #10b981;
+}
+
+.ManageListPage__statValue--notDownloaded {
+  color: #f59e0b;
+}
+
+@media (max-width: 768px) {
+  .ManageListPage__stats {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .ManageListPage__statItem {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    text-align: left;
+  }
+
+  .ManageListPage__statValue {
+    font-size: 1.5rem;
+  }
+}
+
