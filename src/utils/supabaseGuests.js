@@ -13,7 +13,8 @@ const isSupabaseAvailableForDownloads = () => {
 let downloadSupabaseClient = null;
 
 // Get Supabase client for download tracking (creates one if credentials are available)
-const getSupabaseForDownloads = () => {
+// Export this so it can be used for cross-device guest list syncing
+export const getSupabaseForDownloads = () => {
   if (!isSupabaseAvailableForDownloads()) {
     return null;
   }

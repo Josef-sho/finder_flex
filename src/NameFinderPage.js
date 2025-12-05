@@ -4,7 +4,7 @@ import { GUEST_LIST_STORAGE_KEY } from './ManageListPage';
 import { loadGuestListFromFile } from './utils/excelParser';
 import { loadAllInvitations, findInvitationInMap } from './utils/invitationLoader';
 import { downloadFile } from './utils/downloadHelper';
-import { loadGuestsFromSupabase, loadInvitationsFromSupabase, markGuestAsDownloaded, getDownloadedGuests, isGuestDownloaded } from './utils/supabaseGuests';
+import { loadGuestsFromSupabase, loadInvitationsFromSupabase, markGuestAsDownloaded, getDownloadedGuests, isGuestDownloaded, getSupabaseForDownloads } from './utils/supabaseGuests';
 
 const HERO_IMAGE_FILENAME = 'CELEBRANT IMAGE.png';
 const HERO_IMAGE_URL = `${process.env.PUBLIC_URL || ''}/images/${encodeURIComponent(
@@ -101,8 +101,32 @@ const NameFinderPage = () => {
 
   useEffect(() => {
     const loadGuestList = async () => {
-      // Try Supabase first
-      const supabaseGuests = await loadGuestsFromSupabase();
+      // Try Supabase first (with full config)
+      let supabaseGuests = await loadGuestsFromSupabase();
+      
+      // If Supabase is not configured with flag, try loading from Supabase using download client
+      if (supabaseGuests === null) {
+        const downloadSupabase = getSupabaseForDownloads();
+        if (downloadSupabase) {
+          try {
+            const { data, error } = await downloadSupabase
+              .from('guests')
+              .select('*')
+              .order('table_name', { ascending: true })
+              .order('name', { ascending: true });
+            
+            if (!error && data) {
+              supabaseGuests = data.map(guest => ({
+                name: guest.name,
+                table: guest.table_name,
+                downloaded: guest.downloaded || false,
+              }));
+            }
+          } catch (err) {
+            console.error('Error loading guests from Supabase:', err);
+          }
+        }
+      }
       
       // If Supabase is configured (even if empty), use it and don't fall back
       if (supabaseGuests !== null) {

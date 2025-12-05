@@ -7,7 +7,7 @@ import React, {
 } from 'react';
 import './ManageListPage.css';
 import { loadGuestListFromFile, parseExcelFile } from './utils/excelParser';
-import { loadGuestsFromSupabase, saveGuestsToSupabase, clearAllGuestsFromSupabase, clearAllInvitationsFromSupabase, uncheckAllGuests, getDownloadedGuests, markGuestAsDownloaded } from './utils/supabaseGuests';
+import { loadGuestsFromSupabase, saveGuestsToSupabase, clearAllGuestsFromSupabase, clearAllInvitationsFromSupabase, uncheckAllGuests, getDownloadedGuests, markGuestAsDownloaded, getSupabaseForDownloads } from './utils/supabaseGuests';
 
 export const GUEST_LIST_STORAGE_KEY = 'finder-flex:guest-list';
 
@@ -29,8 +29,32 @@ const ManageListPage = ({ onBack }) => {
 
   useEffect(() => {
     const loadGuestList = async () => {
-      // Try Supabase first
-      const supabaseGuests = await loadGuestsFromSupabase();
+      // Try Supabase first (with full config)
+      let supabaseGuests = await loadGuestsFromSupabase();
+      
+      // If Supabase is not configured with flag, try loading from Supabase using download client
+      if (supabaseGuests === null) {
+        const downloadSupabase = getSupabaseForDownloads();
+        if (downloadSupabase) {
+          try {
+            const { data, error } = await downloadSupabase
+              .from('guests')
+              .select('*')
+              .order('table_name', { ascending: true })
+              .order('name', { ascending: true });
+            
+            if (!error && data) {
+              supabaseGuests = data.map(guest => ({
+                name: guest.name,
+                table: guest.table_name,
+                downloaded: guest.downloaded || false,
+              }));
+            }
+          } catch (err) {
+            console.error('Error loading guests from Supabase:', err);
+          }
+        }
+      }
       
       // If Supabase is configured (even if empty), use it and don't fall back
       if (supabaseGuests !== null) {
@@ -275,7 +299,8 @@ const ManageListPage = ({ onBack }) => {
     );
     setGuestList(updatedList);
 
-    // Update Supabase if configured for full guest list
+    // Always try to save to Supabase if credentials are available (for cross-device sync)
+    // First check if Supabase is configured for full guest list
     const supabaseGuests = await loadGuestsFromSupabase();
     if (supabaseGuests !== null) {
       // Update the entire list in Supabase
@@ -285,8 +310,35 @@ const ManageListPage = ({ onBack }) => {
         setError('Failed to save changes to Supabase. Changes saved locally only.');
       }
     } else {
-      // If Supabase is only used for download tracking, update the download record
-      // by marking the new name as downloaded if the old name was downloaded
+      // Even if Supabase isn't configured for guest list, try to save using the download tracking client
+      // This allows cross-device sync even when REACT_APP_USE_SUPABASE is not set
+      const downloadSupabase = getSupabaseForDownloads();
+      
+      if (downloadSupabase) {
+        try {
+          // Delete all existing guests and insert the updated list
+          await downloadSupabase.from('guests').delete().neq('id', 0);
+          
+          if (updatedList.length > 0) {
+            const guestsToInsert = updatedList.map(guest => ({
+              name: guest.name,
+              table_name: guest.table || 'Unknown',
+              downloaded: guest.downloaded || false,
+            }));
+            
+            const { error } = await downloadSupabase.from('guests').insert(guestsToInsert);
+            if (error) {
+              console.error('Error saving guest list to Supabase:', error);
+            } else {
+              console.log('Guest list saved to Supabase for cross-device sync');
+            }
+          }
+        } catch (err) {
+          console.error('Error saving guest list to Supabase:', err);
+        }
+      }
+      
+      // Update download record if needed
       if (hadDownloaded) {
         await markGuestAsDownloaded(trimmedName, guestBeingEdited?.table);
       }
