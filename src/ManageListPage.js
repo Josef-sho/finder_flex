@@ -149,29 +149,103 @@ const ManageListPage = ({ onBack }) => {
       reader.onload = async (e) => {
         try {
           const buffer = e.target?.result;
-          const guests = parseExcelFile(buffer);
+          const newGuests = parseExcelFile(buffer);
 
-          if (!guests.length) {
+          if (!newGuests.length) {
             setGuestList([]);
             setError(
               'We could not find any guests. Make sure column A lists guest names and table labels like "Table 1".'
             );
           } else {
-            setGuestList(guests);
+            // Preserve download statuses from existing list and Supabase
+            const downloadedNames = await getDownloadedGuests();
+            
+            // Create a map of existing guests with their download status
+            const existingGuestsMap = new Map();
+            guestList.forEach(guest => {
+              existingGuestsMap.set(guest.name.toLowerCase(), guest.downloaded);
+            });
+            
+            // Merge new guests with preserved download statuses
+            const guestsWithStatus = newGuests.map(guest => {
+              const normalizedName = guest.name.toLowerCase();
+              const wasDownloaded = existingGuestsMap.get(normalizedName) || 
+                                    downloadedNames.includes(guest.name);
+              
+              return {
+                ...guest,
+                downloaded: wasDownloaded
+              };
+            });
+            
+            setGuestList(guestsWithStatus);
             setError('');
             
             // Save to Supabase if configured
-            const savedToSupabase = await saveGuestsToSupabase(guests);
-            if (savedToSupabase) {
-              console.log('Guest list saved to Supabase');
+            const supabaseGuests = await loadGuestsFromSupabase();
+            if (supabaseGuests !== null) {
+              const saved = await saveGuestsToSupabase(guestsWithStatus);
+              if (saved) {
+                console.log('Guest list saved to Supabase with preserved download statuses');
+              }
+            } else {
+              // Even if Supabase isn't configured with flag, try to save using download client
+              const downloadSupabase = getSupabaseForDownloads();
+              if (downloadSupabase) {
+                try {
+                  // Get all existing guests from Supabase to preserve their download status
+                  const { data: existingData } = await downloadSupabase
+                    .from('guests')
+                    .select('name, downloaded');
+                  
+                  const existingDownloadMap = new Map();
+                  if (existingData) {
+                    existingData.forEach(g => {
+                      existingDownloadMap.set(g.name.toLowerCase(), g.downloaded);
+                    });
+                  }
+                  
+                  // Merge download statuses
+                  const finalGuests = guestsWithStatus.map(guest => {
+                    const normalizedName = guest.name.toLowerCase();
+                    const supabaseDownloaded = existingDownloadMap.get(normalizedName);
+                    return {
+                      ...guest,
+                      downloaded: supabaseDownloaded !== undefined ? supabaseDownloaded : guest.downloaded
+                    };
+                  });
+                  
+                  // Delete all and insert updated list
+                  await downloadSupabase.from('guests').delete().neq('id', 0);
+                  
+                  if (finalGuests.length > 0) {
+                    const guestsToInsert = finalGuests.map(guest => ({
+                      name: guest.name,
+                      table_name: guest.table || 'Unknown',
+                      downloaded: guest.downloaded || false,
+                    }));
+                    
+                    const { error } = await downloadSupabase.from('guests').insert(guestsToInsert);
+                    if (error) {
+                      console.error('Error saving guest list to Supabase:', error);
+                    } else {
+                      console.log('Guest list saved to Supabase with preserved download statuses');
+                    }
+                  }
+                } catch (err) {
+                  console.error('Error saving guest list to Supabase:', err);
+                }
+              }
             }
             
             // Also save to localStorage as backup
             try {
               window.localStorage.setItem(
                 GUEST_LIST_STORAGE_KEY,
-                JSON.stringify(guests)
+                JSON.stringify(guestsWithStatus)
               );
+              // Dispatch event to notify other tabs/pages
+              window.dispatchEvent(new Event('guestListUpdated'));
             } catch (storageError) {
               console.error(
                 'Failed to persist guest list to storage',
