@@ -293,6 +293,8 @@ const ManageListPage = ({ onBack }) => {
     // Update localStorage
     try {
       window.localStorage.setItem(GUEST_LIST_STORAGE_KEY, JSON.stringify(updatedList));
+      // Dispatch custom event to notify other tabs/pages
+      window.dispatchEvent(new Event('guestListUpdated'));
     } catch (storageError) {
       console.error('Failed to update guest list in storage', storageError);
     }

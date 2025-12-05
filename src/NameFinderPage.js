@@ -123,18 +123,33 @@ const NameFinderPage = () => {
         return; // Don't fall back to Excel if Supabase is configured
       }
 
-      // Fallback to Excel file only if Supabase is not configured
-      const possibleFilenames = [
-        'Mr Tunde Martins AKande @60 Guest List.xlsx',
-        'guest-list.xlsx'
-      ];
-      
+      // Fallback to localStorage first (to get any edits from ManageListPage), then Excel file
       let guests = [];
-      for (const filename of possibleFilenames) {
-        const excelUrl = `${process.env.PUBLIC_URL || ''}/data/${encodeURIComponent(filename)}`;
-        guests = await loadGuestListFromFile(excelUrl);
-        if (guests.length > 0) {
-          break; // Found a valid file
+      try {
+        const storedValue = window.localStorage.getItem(GUEST_LIST_STORAGE_KEY);
+        if (storedValue) {
+          const parsed = JSON.parse(storedValue);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            guests = parsed;
+          }
+        }
+      } catch (storageError) {
+        console.error('Failed to read guest list from storage', storageError);
+      }
+
+      // If localStorage is empty, try Excel file
+      if (guests.length === 0) {
+        const possibleFilenames = [
+          'Mr Tunde Martins AKande @60 Guest List.xlsx',
+          'guest-list.xlsx'
+        ];
+        
+        for (const filename of possibleFilenames) {
+          const excelUrl = `${process.env.PUBLIC_URL || ''}/data/${encodeURIComponent(filename)}`;
+          guests = await loadGuestListFromFile(excelUrl);
+          if (guests.length > 0) {
+            break; // Found a valid file
+          }
         }
       }
       
@@ -147,35 +162,37 @@ const NameFinderPage = () => {
         }));
         
         setGuestList(guestsWithStatus);
-        // Also save to localStorage as backup
+        // Also save to localStorage as backup (in case it wasn't already there)
         try {
           window.localStorage.setItem(GUEST_LIST_STORAGE_KEY, JSON.stringify(guestsWithStatus));
         } catch (storageError) {
           console.error('Failed to save guest list to storage', storageError);
         }
-      } else {
-        // Fallback to localStorage if Excel file not found
-        try {
-          const storedValue = window.localStorage.getItem(GUEST_LIST_STORAGE_KEY);
-          if (storedValue) {
-            const parsed = JSON.parse(storedValue);
-            if (Array.isArray(parsed)) {
-              // Ensure download status is loaded from Supabase
-              const downloadedNames = await getDownloadedGuests();
-              const guestsWithStatus = parsed.map(guest => ({
-                ...guest,
-                downloaded: downloadedNames.includes(guest.name)
-              }));
-              setGuestList(guestsWithStatus);
-            }
-          }
-        } catch (storageError) {
-          console.error('Failed to read guest list from storage', storageError);
-        }
       }
     };
 
     loadGuestList();
+
+    // Listen for storage changes to reload when guest list is updated in ManageListPage
+    const handleStorageChange = (e) => {
+      if (e.key === GUEST_LIST_STORAGE_KEY && e.newValue) {
+        loadGuestList();
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+
+    // Also listen for custom event for same-tab updates
+    const handleCustomStorageUpdate = () => {
+      loadGuestList();
+    };
+    window.addEventListener('guestListUpdated', handleCustomStorageUpdate);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('guestListUpdated', handleCustomStorageUpdate);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
