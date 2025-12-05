@@ -410,6 +410,108 @@
   color: #f59e0b;
 }
 
+.ManageListPage__nameCell {
+  position: relative;
+}
+
+.ManageListPage__nameWrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  justify-content: space-between;
+}
+
+.ManageListPage__editButton {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.875rem;
+  border: 1px solid #d8deed;
+  border-radius: 0.375rem;
+  background-color: #f4f6fb;
+  color: #41506c;
+  cursor: pointer;
+  opacity: 0;
+  transition: all 0.2s ease;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ManageListPage__nameCell:hover .ManageListPage__editButton {
+  opacity: 1;
+}
+
+.ManageListPage__editButton:hover {
+  background-color: #2d6cdf;
+  border-color: #2d6cdf;
+  color: #ffffff;
+}
+
+.ManageListPage__editCell {
+  padding: 0.5rem;
+}
+
+.ManageListPage__editWrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ManageListPage__editInput {
+  flex: 1;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.95rem;
+  border: 2px solid #2d6cdf;
+  border-radius: 0.375rem;
+  background-color: #ffffff;
+  color: #1f2a44;
+  font-family: inherit;
+}
+
+.ManageListPage__editInput:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(45, 108, 223, 0.1);
+}
+
+.ManageListPage__editActions {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.ManageListPage__editSave,
+.ManageListPage__editCancel {
+  padding: 0.375rem 0.5rem;
+  font-size: 0.875rem;
+  border: none;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2rem;
+  height: 2rem;
+}
+
+.ManageListPage__editSave {
+  background-color: #10b981;
+  color: #ffffff;
+}
+
+.ManageListPage__editSave:hover {
+  background-color: #059669;
+}
+
+.ManageListPage__editCancel {
+  background-color: #ef4444;
+  color: #ffffff;
+}
+
+.ManageListPage__editCancel:hover {
+  background-color: #dc2626;
+}
+
 @media (max-width: 768px) {
   .ManageListPage__stats {
     flex-direction: column;
@@ -425,6 +527,10 @@
 
   .ManageListPage__statValue {
     font-size: 1.5rem;
+  }
+
+  .ManageListPage__editButton {
+    opacity: 1;
   }
 }
 

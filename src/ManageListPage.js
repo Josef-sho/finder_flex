@@ -7,7 +7,7 @@ import React, {
 } from 'react';
 import './ManageListPage.css';
 import { loadGuestListFromFile, parseExcelFile } from './utils/excelParser';
-import { loadGuestsFromSupabase, saveGuestsToSupabase, clearAllGuestsFromSupabase, clearAllInvitationsFromSupabase, uncheckAllGuests, getDownloadedGuests } from './utils/supabaseGuests';
+import { loadGuestsFromSupabase, saveGuestsToSupabase, clearAllGuestsFromSupabase, clearAllInvitationsFromSupabase, uncheckAllGuests, getDownloadedGuests, markGuestAsDownloaded } from './utils/supabaseGuests';
 
 export const GUEST_LIST_STORAGE_KEY = 'finder-flex:guest-list';
 
@@ -24,6 +24,8 @@ const ManageListPage = ({ onBack }) => {
   const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterDownloaded, setFilterDownloaded] = useState(false);
+  const [editingGuest, setEditingGuest] = useState(null);
+  const [editingName, setEditingName] = useState('');
 
   useEffect(() => {
     const loadGuestList = async () => {
@@ -235,6 +237,71 @@ const ManageListPage = ({ onBack }) => {
     }
   }, [guestList]);
 
+  const handleStartEdit = useCallback((guest, originalName) => {
+    setEditingGuest(originalName);
+    setEditingName(guest.name);
+  }, []);
+
+  const handleCancelEdit = useCallback(() => {
+    setEditingGuest(null);
+    setEditingName('');
+  }, []);
+
+  const handleSaveEdit = useCallback(async (originalName) => {
+    if (!editingName.trim()) {
+      alert('Name cannot be empty');
+      return;
+    }
+
+    const trimmedName = editingName.trim();
+    
+    // Check if the new name already exists (excluding the current guest)
+    const nameExists = guestList.some(
+      g => g.name.toLowerCase() === trimmedName.toLowerCase() && g.name !== originalName
+    );
+    
+    if (nameExists) {
+      alert('A guest with this name already exists');
+      return;
+    }
+
+    // Find the guest being edited to preserve download status
+    const guestBeingEdited = guestList.find(g => g.name === originalName);
+    const hadDownloaded = guestBeingEdited?.downloaded || false;
+
+    // Update local state
+    const updatedList = guestList.map(guest => 
+      guest.name === originalName 
+        ? { ...guest, name: trimmedName }
+        : guest
+    );
+    setGuestList(updatedList);
+
+    // Update Supabase if configured for full guest list
+    const supabaseGuests = await loadGuestsFromSupabase();
+    if (supabaseGuests !== null) {
+      // Update the entire list in Supabase
+      await saveGuestsToSupabase(updatedList);
+    } else {
+      // If Supabase is only used for download tracking, update the download record
+      // by marking the new name as downloaded if the old name was downloaded
+      if (hadDownloaded) {
+        await markGuestAsDownloaded(trimmedName, guestBeingEdited?.table);
+      }
+    }
+
+    // Update localStorage
+    try {
+      window.localStorage.setItem(GUEST_LIST_STORAGE_KEY, JSON.stringify(updatedList));
+    } catch (storageError) {
+      console.error('Failed to update guest list in storage', storageError);
+    }
+
+    setEditingGuest(null);
+    setEditingName('');
+    setError('');
+  }, [editingName, guestList]);
+
   const handleClear = useCallback(async () => {
     if (!window.confirm('Are you sure you want to clear all guests and invitations? This cannot be undone.')) {
       return;
@@ -375,28 +442,88 @@ const ManageListPage = ({ onBack }) => {
                 </thead>
                 <tbody>
                   {filteredGuestList.length > 0 ? (
-                    filteredGuestList.map((guest, index) => (
-                      <tr key={`${guest.name}-${index}`}>
-                        {displayColumns.map((column) => {
-                          if (column.key === 'downloaded') {
+                    filteredGuestList.map((guest, index) => {
+                      const isEditing = editingGuest === guest.name;
+                      return (
+                        <tr key={`${guest.name}-${index}`}>
+                          {displayColumns.map((column) => {
+                            if (column.key === 'downloaded') {
+                              return (
+                                <td key={column.key} className="ManageListPage__checkCell">
+                                  {guest.downloaded ? (
+                                    <span className="ManageListPage__checkmark" aria-label="Downloaded">✓</span>
+                                  ) : (
+                                    <span className="ManageListPage__noCheck" aria-label="Not downloaded">—</span>
+                                  )}
+                                </td>
+                              );
+                            }
+                            if (column.key === 'name' && isEditing) {
+                              return (
+                                <td key={column.key} className="ManageListPage__editCell">
+                                  <div className="ManageListPage__editWrapper">
+                                    <input
+                                      type="text"
+                                      className="ManageListPage__editInput"
+                                      value={editingName}
+                                      onChange={(e) => setEditingName(e.target.value)}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                          handleSaveEdit(guest.name);
+                                        } else if (e.key === 'Escape') {
+                                          handleCancelEdit();
+                                        }
+                                      }}
+                                      autoFocus
+                                    />
+                                    <div className="ManageListPage__editActions">
+                                      <button
+                                        type="button"
+                                        className="ManageListPage__editSave"
+                                        onClick={() => handleSaveEdit(guest.name)}
+                                        aria-label="Save"
+                                      >
+                                        ✓
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="ManageListPage__editCancel"
+                                        onClick={handleCancelEdit}
+                                        aria-label="Cancel"
+                                      >
+                                        ×
+                                      </button>
+                                    </div>
+                                  </div>
+                                </td>
+                              );
+                            }
+                            if (column.key === 'name' && !isEditing) {
+                              return (
+                                <td key={column.key} className="ManageListPage__nameCell">
+                                  <div className="ManageListPage__nameWrapper">
+                                    <span>{guest.name || '—'}</span>
+                                    <button
+                                      type="button"
+                                      className="ManageListPage__editButton"
+                                      onClick={() => handleStartEdit(guest, guest.name)}
+                                      aria-label="Edit name"
+                                    >
+                                      ✎
+                                    </button>
+                                  </div>
+                                </td>
+                              );
+                            }
                             return (
-                              <td key={column.key} className="ManageListPage__checkCell">
-                                {guest.downloaded ? (
-                                  <span className="ManageListPage__checkmark" aria-label="Downloaded">✓</span>
-                                ) : (
-                                  <span className="ManageListPage__noCheck" aria-label="Not downloaded">—</span>
-                                )}
+                              <td key={column.key}>
+                                {guest[column.key] || '—'}
                               </td>
                             );
-                          }
-                          return (
-                            <td key={column.key}>
-                              {guest[column.key] || '—'}
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    ))
+                          })}
+                        </tr>
+                      );
+                    })
                   ) : (
                     <tr>
                       <td colSpan={displayColumns.length} className="ManageListPage__noResults">
