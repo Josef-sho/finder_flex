@@ -29,21 +29,21 @@ const UploadInvitationsPage = ({ onBack }) => {
         setGuestList(guests);
         try {
           window.localStorage.setItem(GUEST_LIST_STORAGE_KEY, JSON.stringify(guests));
-        } catch (storageError) {
+    } catch (storageError) {
           console.error('Failed to save guest list to storage', storageError);
-        }
+    }
       } else {
-        try {
-          const storedValue = window.localStorage.getItem(GUEST_LIST_STORAGE_KEY);
-          if (storedValue) {
-            const parsed = JSON.parse(storedValue);
-            if (Array.isArray(parsed)) {
-              setGuestList(parsed);
-            }
-          }
-        } catch (storageError) {
-          console.error('Failed to read guest list from storage', storageError);
+    try {
+      const storedValue = window.localStorage.getItem(GUEST_LIST_STORAGE_KEY);
+      if (storedValue) {
+        const parsed = JSON.parse(storedValue);
+        if (Array.isArray(parsed)) {
+          setGuestList(parsed);
         }
+      }
+    } catch (storageError) {
+      console.error('Failed to read guest list from storage', storageError);
+    }
       }
     };
 
@@ -78,8 +78,8 @@ const UploadInvitationsPage = ({ onBack }) => {
       .map(([name, guests]) => {
         const invitation = findInvitationInMap(name, invitations);
         return {
-          name,
-          count: guests.length,
+        name,
+        count: guests.length,
           invitation,
         };
       })
@@ -119,11 +119,11 @@ const UploadInvitationsPage = ({ onBack }) => {
             <p className="UploadInvitationsPage__status">Scanning public folder for invitations...</p>
           ) : (
             tables.map((table) => (
-              <article key={table.name} className="UploadInvitationsPage__card">
-                <h2 className="UploadInvitationsPage__cardTitle">{table.name}</h2>
-                <p className="UploadInvitationsPage__cardMeta">
-                  {table.count} guest{table.count === 1 ? '' : 's'}
-                </p>
+            <article key={table.name} className="UploadInvitationsPage__card">
+              <h2 className="UploadInvitationsPage__cardTitle">{table.name}</h2>
+              <p className="UploadInvitationsPage__cardMeta">
+                {table.count} guest{table.count === 1 ? '' : 's'}
+              </p>
                 <div className="UploadInvitationsPage__status">
                   {table.invitation ? (
                     <div className="UploadInvitationsPage__statusBadge UploadInvitationsPage__statusBadge--success">
@@ -134,25 +134,25 @@ const UploadInvitationsPage = ({ onBack }) => {
                       Missing Invitation
                     </div>
                   )}
-                </div>
+              </div>
                 {table.invitation ? (
-                  <div className="UploadInvitationsPage__fileInfo">
+                <div className="UploadInvitationsPage__fileInfo">
                     <p className="UploadInvitationsPage__fileName">{table.invitation.name}</p>
-                    <a
+                  <a
                       href={table.invitation.url}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="UploadInvitationsPage__view"
-                    >
+                  >
                       View
-                    </a>
-                  </div>
+                  </a>
+                </div>
                 ) : (
                   <p className="UploadInvitationsPage__missingNote">
                     Place <strong>{table.name}.pdf</strong> (or .png/.jpg) in <code>public/data/invitations/</code>.
                   </p>
                 )}
-              </article>
+            </article>
             ))
           )}
         </section>
