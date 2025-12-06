@@ -327,6 +327,48 @@ const ManageListPage = ({ onBack }) => {
     return filtered;
   }, [guestList, searchQuery, filterDownloaded, filterTable]);
 
+  const handleToggleDownloaded = useCallback(async (guestName, currentStatus) => {
+    const newStatus = !currentStatus;
+    const guest = guestList.find(g => g.name === guestName);
+
+    // Update local state immediately
+    const updatedList = guestList.map(g => 
+      g.name === guestName 
+        ? { ...g, downloaded: newStatus }
+        : g
+    );
+    setGuestList(updatedList);
+
+    // Update Supabase
+    if (newStatus) {
+      await markGuestAsDownloaded(guestName, guest?.table);
+    } else {
+      // To unmark, we need to update Supabase directly
+      const downloadSupabase = getSupabaseForDownloads();
+      if (downloadSupabase) {
+        try {
+          const { error } = await downloadSupabase
+            .from('guests')
+            .update({ downloaded: false })
+            .eq('name', guestName);
+          if (error) {
+            console.error('Error unmarking download in Supabase:', error);
+          }
+        } catch (err) {
+          console.error('Error unmarking download in Supabase:', err);
+        }
+      }
+    }
+
+    // Update localStorage
+    try {
+      window.localStorage.setItem(GUEST_LIST_STORAGE_KEY, JSON.stringify(updatedList));
+      window.dispatchEvent(new Event('guestListUpdated'));
+    } catch (storageError) {
+      console.error('Failed to update guest list in storage', storageError);
+    }
+  }, [guestList]);
+
   const handleUncheckAll = useCallback(async () => {
     if (!window.confirm('Are you sure you want to reset all download statuses? This will allow all guests to download their invitations again.')) {
       return;
@@ -617,11 +659,19 @@ const ManageListPage = ({ onBack }) => {
                             if (column.key === 'downloaded') {
                               return (
                                 <td key={column.key} className="ManageListPage__checkCell">
-                                  {guest.downloaded ? (
-                                    <span className="ManageListPage__checkmark" aria-label="Downloaded">✓</span>
-                                  ) : (
-                                    <span className="ManageListPage__noCheck" aria-label="Not downloaded">—</span>
-                                  )}
+                                  <button
+                                    type="button"
+                                    className={`ManageListPage__downloadToggle ${guest.downloaded ? 'ManageListPage__downloadToggle--downloaded' : ''}`}
+                                    onClick={() => handleToggleDownloaded(guest.name, guest.downloaded)}
+                                    aria-label={guest.downloaded ? 'Mark as not downloaded' : 'Mark as downloaded'}
+                                    title={guest.downloaded ? 'Click to mark as not downloaded' : 'Click to mark as downloaded'}
+                                  >
+                                    {guest.downloaded ? (
+                                      <span className="ManageListPage__checkmark">✓</span>
+                                    ) : (
+                                      <span className="ManageListPage__noCheck">—</span>
+                                    )}
+                                  </button>
                                 </td>
                               );
                             }
