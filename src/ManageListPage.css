@@ -320,6 +320,45 @@
   display: flex;
   gap: 0.75rem;
   flex-wrap: wrap;
+  align-items: center;
+}
+
+.ManageListPage__tableFilterWrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ManageListPage__tableFilterLabel {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #41506c;
+  white-space: nowrap;
+}
+
+.ManageListPage__tableFilter {
+  padding: 0.625rem 1rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  border: 2px solid #d8deed;
+  border-radius: 0.5rem;
+  background-color: #ffffff;
+  color: #1f2a44;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 180px;
+  font-family: inherit;
+}
+
+.ManageListPage__tableFilter:hover {
+  border-color: #2d6cdf;
+  background-color: #f4f6fb;
+}
+
+.ManageListPage__tableFilter:focus {
+  outline: none;
+  border-color: #2d6cdf;
+  box-shadow: 0 0 0 3px rgba(45, 108, 223, 0.1);
 }
 
 .ManageListPage__filterButton {

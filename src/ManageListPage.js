@@ -24,6 +24,7 @@ const ManageListPage = ({ onBack }) => {
   const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterDownloaded, setFilterDownloaded] = useState(false);
+  const [filterTable, setFilterTable] = useState('');
   const [editingGuest, setEditingGuest] = useState(null);
   const [editingName, setEditingName] = useState('');
 
@@ -282,11 +283,28 @@ const ManageListPage = ({ onBack }) => {
     []
   );
 
-  // Filter guests based on search query and download status
+  // Get unique tables for filter dropdown
+  const uniqueTables = useMemo(() => {
+    const tables = [...new Set(guestList.map(g => g.table).filter(Boolean))];
+    return tables.sort((a, b) => {
+      // Extract numbers for numeric sorting
+      const numA = parseInt(a.match(/\d+/)?.[0] || '0');
+      const numB = parseInt(b.match(/\d+/)?.[0] || '0');
+      if (numA !== numB) return numA - numB;
+      return a.localeCompare(b);
+    });
+  }, [guestList]);
+
+  // Filter guests based on search query, download status, and table
   const filteredGuestList = useMemo(() => {
     let filtered = guestList;
 
-    // Filter by download status first
+    // Filter by table first
+    if (filterTable) {
+      filtered = filtered.filter((guest) => guest.table === filterTable);
+    }
+
+    // Filter by download status
     if (filterDownloaded) {
       filtered = filtered.filter((guest) => guest.downloaded === true);
     }
@@ -307,7 +325,7 @@ const ManageListPage = ({ onBack }) => {
     }
 
     return filtered;
-  }, [guestList, searchQuery, filterDownloaded]);
+  }, [guestList, searchQuery, filterDownloaded, filterTable]);
 
   const handleUncheckAll = useCallback(async () => {
     if (!window.confirm('Are you sure you want to reset all download statuses? This will allow all guests to download their invitations again.')) {
@@ -517,6 +535,24 @@ const ManageListPage = ({ onBack }) => {
               )}
             </div>
             <div className="ManageListPage__filters">
+              <div className="ManageListPage__tableFilterWrapper">
+                <label htmlFor="table-filter" className="ManageListPage__tableFilterLabel">
+                  Filter by Table:
+                </label>
+                <select
+                  id="table-filter"
+                  className="ManageListPage__tableFilter"
+                  value={filterTable}
+                  onChange={(e) => setFilterTable(e.target.value)}
+                >
+                  <option value="">All Tables</option>
+                  {uniqueTables.map((table) => (
+                    <option key={table} value={table}>
+                      {table}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <button
                 type="button"
                 className={`ManageListPage__filterButton ${filterDownloaded ? 'ManageListPage__filterButton--active' : ''}`}
@@ -535,10 +571,11 @@ const ManageListPage = ({ onBack }) => {
                 )}
               </button>
             </div>
-            {(searchQuery || filterDownloaded) && (
+            {(searchQuery || filterDownloaded || filterTable) && (
               <div className="ManageListPage__searchResults">
                 <p className="ManageListPage__searchResultsText">
                   Showing {filteredGuestList.length} of {guestList.length} guests
+                  {filterTable && ` from ${filterTable}`}
                   {filterDownloaded && ` (${guestList.filter(g => g.downloaded).length} downloaded)`}
                 </p>
               </div>
