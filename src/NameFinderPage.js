@@ -458,14 +458,6 @@ const NameFinderPage = () => {
                         Your invitation is ready
                       </p>
                       <div className="NameFinderPage__pdfActions">
-                        <a
-                          href={invitation.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="NameFinderPage__pdfLink NameFinderPage__pdfLink--view"
-                        >
-                          View PDF
-                        </a>
                         <button
                           type="button"
                           onClick={async () => {
