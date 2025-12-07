@@ -27,6 +27,9 @@ const ManageListPage = ({ onBack }) => {
   const [filterTable, setFilterTable] = useState('');
   const [editingGuest, setEditingGuest] = useState(null);
   const [editingName, setEditingName] = useState('');
+  const [showAddGuest, setShowAddGuest] = useState(false);
+  const [newGuestName, setNewGuestName] = useState('');
+  const [newGuestTable, setNewGuestTable] = useState('');
 
   useEffect(() => {
     const loadGuestList = async () => {
@@ -279,6 +282,7 @@ const ManageListPage = ({ onBack }) => {
       { key: 'name', label: 'Guest' },
       { key: 'table', label: 'Table' },
       { key: 'downloaded', label: 'Downloaded' },
+      { key: 'actions', label: 'Actions' },
     ],
     []
   );
@@ -625,6 +629,13 @@ const ManageListPage = ({ onBack }) => {
             <div className="ManageListPage__actions">
               <button
                 type="button"
+                className="ManageListPage__addButton"
+                onClick={() => setShowAddGuest(true)}
+              >
+                + Add New Guest
+              </button>
+              <button
+                type="button"
                 className="ManageListPage__clearButton"
                 onClick={handleClear}
               >
@@ -638,6 +649,76 @@ const ManageListPage = ({ onBack }) => {
                 Reset All Downloads
               </button>
             </div>
+            {showAddGuest && (
+              <div className="ManageListPage__addGuestModal">
+                <div className="ManageListPage__addGuestContent">
+                  <h3 className="ManageListPage__addGuestTitle">Add New Guest</h3>
+                  <div className="ManageListPage__addGuestForm">
+                    <div className="ManageListPage__addGuestField">
+                      <label htmlFor="new-guest-name" className="ManageListPage__addGuestLabel">
+                        Guest Name:
+                      </label>
+                      <input
+                        id="new-guest-name"
+                        type="text"
+                        className="ManageListPage__addGuestInput"
+                        value={newGuestName}
+                        onChange={(e) => setNewGuestName(e.target.value)}
+                        placeholder="Enter guest name"
+                        autoFocus
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            handleAddGuest();
+                          } else if (e.key === 'Escape') {
+                            setShowAddGuest(false);
+                            setNewGuestName('');
+                            setNewGuestTable('');
+                          }
+                        }}
+                      />
+                    </div>
+                    <div className="ManageListPage__addGuestField">
+                      <label htmlFor="new-guest-table" className="ManageListPage__addGuestLabel">
+                        Table:
+                      </label>
+                      <select
+                        id="new-guest-table"
+                        className="ManageListPage__addGuestInput"
+                        value={newGuestTable}
+                        onChange={(e) => setNewGuestTable(e.target.value)}
+                      >
+                        <option value="">Select a table</option>
+                        {uniqueTables.map((table) => (
+                          <option key={table} value={table}>
+                            {table}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="ManageListPage__addGuestActions">
+                      <button
+                        type="button"
+                        className="ManageListPage__addGuestSave"
+                        onClick={handleAddGuest}
+                      >
+                        Add Guest
+                      </button>
+                      <button
+                        type="button"
+                        className="ManageListPage__addGuestCancel"
+                        onClick={() => {
+                          setShowAddGuest(false);
+                          setNewGuestName('');
+                          setNewGuestTable('');
+                        }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
             <div className="ManageListPage__tableWrapper">
               <table className="ManageListPage__table">
                 <thead>
@@ -729,6 +810,21 @@ const ManageListPage = ({ onBack }) => {
                                       ✎
                                     </button>
                                   </div>
+                                </td>
+                              );
+                            }
+                            if (column.key === 'actions') {
+                              return (
+                                <td key={column.key} className="ManageListPage__actionsCell">
+                                  <button
+                                    type="button"
+                                    className="ManageListPage__deleteButton"
+                                    onClick={() => handleDeleteGuest(guest.name)}
+                                    aria-label={`Delete ${guest.name}`}
+                                    title="Delete guest"
+                                  >
+                                    🗑
+                                  </button>
                                 </td>
                               );
                             }
