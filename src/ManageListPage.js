@@ -397,6 +397,123 @@ const ManageListPage = ({ onBack }) => {
     }
   }, [guestList]);
 
+  const handleAddGuest = useCallback(async () => {
+    if (!newGuestName.trim()) {
+      alert('Please enter a guest name');
+      return;
+    }
+
+    if (!newGuestTable.trim()) {
+      alert('Please select a table');
+      return;
+    }
+
+    // Check if name already exists
+    const nameExists = guestList.some(
+      g => g.name.toLowerCase() === newGuestName.trim().toLowerCase()
+    );
+    
+    if (nameExists) {
+      alert('A guest with this name already exists');
+      return;
+    }
+
+    const newGuest = {
+      name: newGuestName.trim(),
+      table: newGuestTable.trim(),
+      downloaded: false,
+    };
+
+    // Update local state
+    const updatedList = [...guestList, newGuest];
+    setGuestList(updatedList);
+
+    // Update Supabase
+    const supabaseGuests = await loadGuestsFromSupabase();
+    if (supabaseGuests !== null) {
+      const saved = await saveGuestsToSupabase(updatedList);
+      if (!saved) {
+        console.error('Failed to save new guest to Supabase');
+      }
+    } else {
+      // Even if Supabase isn't configured with flag, try to save using download client
+      const downloadSupabase = getSupabaseForDownloads();
+      if (downloadSupabase) {
+        try {
+          const { error } = await downloadSupabase.from('guests').insert({
+            name: newGuest.name,
+            table_name: newGuest.table,
+            downloaded: false,
+          });
+          if (error) {
+            console.error('Error adding guest to Supabase:', error);
+          }
+        } catch (err) {
+          console.error('Error adding guest to Supabase:', err);
+        }
+      }
+    }
+
+    // Update localStorage
+    try {
+      window.localStorage.setItem(GUEST_LIST_STORAGE_KEY, JSON.stringify(updatedList));
+      window.dispatchEvent(new Event('guestListUpdated'));
+    } catch (storageError) {
+      console.error('Failed to update guest list in storage', storageError);
+    }
+
+    // Reset form
+    setNewGuestName('');
+    setNewGuestTable('');
+    setShowAddGuest(false);
+    setError('');
+  }, [newGuestName, newGuestTable, guestList]);
+
+  const handleDeleteGuest = useCallback(async (guestName) => {
+    if (!window.confirm(`Are you sure you want to delete "${guestName}"? This cannot be undone.`)) {
+      return;
+    }
+
+    // Update local state
+    const updatedList = guestList.filter(g => g.name !== guestName);
+    setGuestList(updatedList);
+
+    // Update Supabase
+    const supabaseGuests = await loadGuestsFromSupabase();
+    if (supabaseGuests !== null) {
+      const saved = await saveGuestsToSupabase(updatedList);
+      if (!saved) {
+        console.error('Failed to delete guest from Supabase');
+      }
+    } else {
+      // Even if Supabase isn't configured with flag, try to delete using download client
+      const downloadSupabase = getSupabaseForDownloads();
+      if (downloadSupabase) {
+        try {
+          const { error } = await downloadSupabase
+            .from('guests')
+            .delete()
+            .eq('name', guestName);
+          if (error) {
+            console.error('Error deleting guest from Supabase:', error);
+          }
+        } catch (err) {
+          console.error('Error deleting guest from Supabase:', err);
+        }
+      }
+    }
+
+    // Update localStorage
+    try {
+      window.localStorage.setItem(GUEST_LIST_STORAGE_KEY, JSON.stringify(updatedList));
+      window.dispatchEvent(new Event('guestListUpdated'));
+    } catch (storageError) {
+      console.error('Failed to update guest list in storage', storageError);
+    }
+
+    setError('');
+  }, [guestList]);
+
   const handleStartEdit = useCallback((guest, originalName) => {
     setEditingGuest(originalName);
     setEditingName(guest.name);
