@@ -332,7 +332,7 @@ const NameFinderPage = () => {
             TUNDE <span className="NameFinderPage__titleAccent">@ 60</span>
           </h1>
           <p className="NameFinderPage__subtitle">
-            Kindly enter your first name exactly as it appears on your invitation to
+            Kindly enter your surname exactly as it appears on your invitation to
             confirm attendance.
           </p>
         </div>
@@ -349,7 +349,7 @@ const NameFinderPage = () => {
             value={query}
             onChange={handleChange}
             className="NameFinderPage__input"
-            placeholder="Write first name"
+            placeholder="Write  surname"
             aria-label="Search guest name"
           />
           <button type="submit" className="NameFinderPage__searchButton">
