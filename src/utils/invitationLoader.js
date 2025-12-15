@@ -100,7 +100,12 @@ export const findInvitationInMap = (tableName, invitationMap) => {
 export const getInvitationForTable = async (tableName) => {
   if (!tableName) return null;
 
+  // Skip "Unknown" table names - they don't have invitations
   const normalizedTable = normalizeTableName(tableName);
+  if (normalizedTable.toLowerCase() === 'unknown') {
+    return null;
+  }
+
   const tableNumber = extractTableNumber(tableName);
   const descriptiveName = extractDescriptiveName(tableName);
   const baseUrl = `${process.env.PUBLIC_URL || ''}/data/invitations/`;
@@ -114,7 +119,10 @@ export const getInvitationForTable = async (tableName) => {
       filenameVariations.push(`${tableNumber}.${compactName}`);
     }
   }
-  filenameVariations.push(normalizedTable);
+  // Only add normalizedTable if we have a table number (to avoid trying Unknown files)
+  if (tableNumber) {
+    filenameVariations.push(normalizedTable);
+  }
 
   for (const filenameBase of filenameVariations) {
     for (const ext of extensions) {
@@ -137,7 +145,10 @@ export const getInvitationForTable = async (tableName) => {
           const contentLength = response.headers.get('content-length');
 
           if (contentType && contentType.includes('text/html')) {
-            console.log(`Skipping ${url} - server returned HTML (likely 404 page)`);
+            // Only log 404s for non-Unknown files to reduce console noise
+            if (!candidate.filename.toLowerCase().includes('unknown')) {
+              console.log(`Skipping ${url} - server returned HTML (likely 404 page)`);
+            }
             continue;
           }
 

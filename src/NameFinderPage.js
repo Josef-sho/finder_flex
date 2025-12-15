@@ -471,10 +471,17 @@ const NameFinderPage = () => {
                             
                             try {
                               await downloadFile(fileUrl, fileName);
-                              // Mark as downloaded only after successful download
-                              const marked = await markGuestAsDownloaded(selectedGuest.name);
+                              // Mark as downloaded only after successful download (Supabase is used ONLY for download tracking)
+                              const marked = await markGuestAsDownloaded(selectedGuest.name, selectedGuest.table);
                               if (marked) {
                                 // Update local state
+                                setGuestList(prev => prev.map(g => 
+                                  g.name === selectedGuest.name ? { ...g, downloaded: true } : g
+                                ));
+                                setSelectedGuest(prev => prev ? { ...prev, downloaded: true } : null);
+                              } else {
+                                console.error('Failed to mark guest as downloaded. Check Supabase configuration.');
+                                // Still update local state even if Supabase fails
                                 setGuestList(prev => prev.map(g => 
                                   g.name === selectedGuest.name ? { ...g, downloaded: true } : g
                                 ));

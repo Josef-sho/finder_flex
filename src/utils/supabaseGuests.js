@@ -324,6 +324,7 @@ export const clearAllInvitationsFromSupabase = async () => {
  */
 export const markGuestAsDownloaded = async (guestName, tableName = null) => {
   if (!guestName) {
+    console.error('markGuestAsDownloaded: guestName is required');
     return false;
   }
 
@@ -336,11 +337,16 @@ export const markGuestAsDownloaded = async (guestName, tableName = null) => {
 
   try {
     // First, check if guest exists
-    const { data: existing } = await downloadSupabase
+    const { data: existing, error: selectError } = await downloadSupabase
       .from(TABLES.GUESTS)
       .select('id, name, table_name')
       .eq('name', guestName)
       .maybeSingle();
+
+    if (selectError && selectError.code !== 'PGRST116') {
+      // PGRST116 is "not found" which is fine, other errors are not
+      console.error('Error checking if guest exists in Supabase:', selectError);
+    }
 
     if (existing) {
       // Update existing record
@@ -350,9 +356,11 @@ export const markGuestAsDownloaded = async (guestName, tableName = null) => {
         .eq('name', guestName);
 
       if (error) {
-        console.error('Error marking guest as downloaded in Supabase:', error);
+        console.error('Error marking guest as downloaded in Supabase (update):', error);
+        console.error('Guest name:', guestName, 'Table:', tableName);
         return false;
       }
+      console.log('Successfully marked guest as downloaded (update):', guestName);
       return true;
     } else {
       // Insert new record (we only need name and downloaded status)
@@ -367,12 +375,16 @@ export const markGuestAsDownloaded = async (guestName, tableName = null) => {
 
       if (error) {
         console.error('Error inserting guest download status in Supabase:', error);
+        console.error('Guest name:', guestName, 'Table:', tableName);
+        console.error('Full error details:', JSON.stringify(error, null, 2));
         return false;
       }
+      console.log('Successfully marked guest as downloaded (insert):', guestName);
       return true;
     }
   } catch (err) {
-    console.error('Error marking guest as downloaded in Supabase:', err);
+    console.error('Error marking guest as downloaded in Supabase (catch):', err);
+    console.error('Guest name:', guestName, 'Table:', tableName);
     return false;
   }
 };
