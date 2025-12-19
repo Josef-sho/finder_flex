@@ -111,7 +111,7 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<NameFinderPage />} />
-          {/* <Route path="/tables/:tableNumber" element={<TableGuestsPage />} /> */}
+          <Route path="/tables/:tableNumber" element={<TableGuestsPage />} /> 
           <Route path={`${ADMIN_SECRET_PATH}/*`} element={<AdminGate />}>
             <Route index element={<AdminDashboard />} />
             <Route path="manage" element={<ManageListRoute />} />
